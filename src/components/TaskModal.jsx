@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 
 export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
     const [text, setText] = useState('')
@@ -9,7 +9,6 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
         if (isOpen) {
             setText('')
             setSubtasks([])
-            // Small timeout to ensure modal is rendered before focusing
             setTimeout(() => inputRef.current?.focus(), 10)
         }
     }, [isOpen])
@@ -47,17 +46,17 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
             className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-in fade-in transition-all"
             onClick={handleBackdropClick}
         >
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
-                <h2 className="text-2xl font-black mb-6 text-slate-800">Add New Task</h2>
+            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200 border border-transparent dark:border-slate-700">
+                <h2 className="text-2xl font-black mb-6 text-slate-800 dark:text-white">Add New Task</h2>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Task Description</label>
+                        <label className="block text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Task Description</label>
                         <input
                             ref={inputRef}
                             type="text"
                             placeholder="What needs doing?"
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 transition-all font-medium"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 dark:focus:ring-indigo-900/30 transition-all font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600"
                             value={text}
                             onChange={(e) => setText(e.target.value)}
                             required
@@ -66,11 +65,11 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
 
                     <div>
                         <div className="flex justify-between items-center mb-2">
-                            <label className="block text-xs font-black uppercase tracking-widest text-slate-400">Sub-tasks</label>
+                            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Sub-tasks</label>
                             <button
                                 type="button"
                                 onClick={handleAddSubtask}
-                                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
+                                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
                             >
                                 + Add Sub-task
                             </button>
@@ -82,7 +81,7 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
                                     <input
                                         type="text"
                                         placeholder="Sub-task details..."
-                                        className="flex-1 px-3 py-2 rounded-lg border border-slate-100 text-sm outline-none focus:border-indigo-300 bg-slate-50"
+                                        className="flex-1 px-3 py-2 rounded-lg border border-slate-100 dark:border-slate-700 text-sm outline-none focus:border-indigo-300 bg-slate-50 dark:bg-slate-700/50 text-slate-800 dark:text-slate-200"
                                         value={sub.text}
                                         onChange={(e) => handleSubtaskChange(sub.id, e.target.value)}
                                         autoFocus
@@ -97,7 +96,7 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
                                 </div>
                             ))}
                             {subtasks.length === 0 && (
-                                <p className="text-xs text-slate-300 italic py-2">No sub-tasks added yet.</p>
+                                <p className="text-xs text-slate-300 dark:text-slate-600 italic py-2">No sub-tasks added yet.</p>
                             )}
                         </div>
                     </div>
@@ -106,13 +105,13 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+                            className="flex-1 px-6 py-3 rounded-xl font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-[0.98]"
+                            className="flex-1 bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 dark:shadow-none transition-all active:scale-[0.98]"
                         >
                             Create Task
                         </button>

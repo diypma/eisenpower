@@ -4,6 +4,7 @@ import TaskNode from './components/TaskNode'
 import PriorityPanel from './components/PriorityPanel'
 import TaskModal from './components/TaskModal'
 import TaskDetailModal from './components/TaskDetailModal'
+import SettingsMenu from './components/SettingsMenu'
 
 function App() {
   const [tasks, setTasks] = useState(() => {
@@ -29,9 +30,22 @@ function App() {
     }
   })
 
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('eisenpower-theme') || 'light'
+  })
+
   useEffect(() => {
     localStorage.setItem('eisenpower-tasks', JSON.stringify(tasks))
   }, [tasks])
+
+  useEffect(() => {
+    localStorage.setItem('eisenpower-theme', theme)
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [theme])
 
   const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
   const [expandedTaskId, setExpandedTaskId] = useState(null)
@@ -78,23 +92,32 @@ function App() {
     }))
   }
 
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light')
+  }
+
   const expandedTask = tasks.find(t => t.id === expandedTaskId)
 
   return (
-    <div className="h-screen bg-white font-sans text-slate-900 flex flex-col">
+    <div className={`h-screen bg-white dark:bg-slate-900 font-sans text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200`}>
       {/* Ultra Compact Header */}
-      <header className="px-8 py-4 flex justify-between items-center bg-white">
-        <h1 className="text-xl font-black tracking-tighter bg-gradient-to-br from-indigo-600 to-violet-700 bg-clip-text text-transparent">
+      <header className="px-8 py-4 flex justify-between items-center bg-white dark:bg-slate-900 z-50 relative shadow-sm dark:shadow-slate-800 border-b border-transparent dark:border-slate-800 transition-colors">
+        <h1 className="text-xl font-black tracking-tighter bg-gradient-to-br from-indigo-600 to-violet-700 dark:from-indigo-400 dark:to-violet-400 bg-clip-text text-transparent">
           Eisenpower
         </h1>
         <div className="flex items-center gap-4">
-          {/* Add any global actions here */}
+          {/* Settings Menu */}
+          <SettingsMenu
+            tasks={tasks}
+            isDark={theme === 'dark'}
+            onToggleTheme={toggleTheme}
+          />
         </div>
       </header>
 
-      <main className="flex-1 flex gap-8 p-8 bg-slate-50/50">
+      <main className="flex-1 flex gap-8 p-8 bg-slate-50/50 dark:bg-slate-950 transition-colors">
         {/* Graph Paper Matrix */}
-        <div className="flex-1 bg-white rounded-[32px] border border-slate-100 shadow-sm relative pr-20 p-8">
+        <div className="flex-1 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm relative pr-20 p-8 z-0 transition-colors">
           <div className="absolute inset-8" ref={graphContainerRef}>
             <GraphPaper onAddTask={handleOpenModal}>
               {tasks.map(task => (
