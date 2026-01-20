@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask, onDelete, onSubtaskDragStart, onAddSubtask }) {
     const [isAdding, setIsAdding] = useState(false)
