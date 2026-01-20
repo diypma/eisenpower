@@ -52,6 +52,7 @@ function App() {
   const [expandedTaskId, setExpandedTaskId] = useState(null)
   const [hoveredTaskFamily, setHoveredTaskFamily] = useState(null) // Track parent ID for highlighting
   const [activeTab, setActiveTab] = useState('matrix') // 'matrix' | 'list'
+  const [zoom, setZoom] = useState(1)
   const graphContainerRef = useRef(null)
 
   const handleOpenModal = (x, y) => {
@@ -176,6 +177,8 @@ function App() {
             <GraphPaper
               onAddTask={handleOpenModal}
               onDrop={handleSubtaskDrop}
+              zoom={zoom}
+              onZoomChange={setZoom}
             >
               {tasks.filter(task => !task.completed).map(task => (
                 <TaskNode

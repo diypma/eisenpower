@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 
-export default function GraphPaper({ onAddTask, onDrop, children }) {
+export default function GraphPaper({ onAddTask, onDrop, zoom = 1, onZoomChange, children }) {
     const containerRef = useRef(null)
 
     const handleDragOver = (e) => {
@@ -58,7 +58,38 @@ export default function GraphPaper({ onAddTask, onDrop, children }) {
     }
 
     return (
-        <div className="relative w-full h-full flex items-center justify-center">
+        <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+            {/* Zoom Controls */}
+            {onZoomChange && (
+                <div className="absolute bottom-4 left-4 z-50 flex flex-col gap-2 bg-white dark:bg-slate-800 p-2 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-700">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onZoomChange(Math.min(2, zoom + 0.1)) }}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors"
+                        title="Zoom In"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onZoomChange(1) }}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold text-slate-500 dark:text-slate-500 transition-colors"
+                        title="Reset Zoom"
+                    >
+                        {(zoom * 100).toFixed(0)}%
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); onZoomChange(Math.max(0.2, zoom - 0.1)) }}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors"
+                        title="Zoom Out"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                        </svg>
+                    </button>
+                </div>
+            )}
+
             {/* Graph Paper Container */}
             <div
                 ref={containerRef}
@@ -71,6 +102,9 @@ export default function GraphPaper({ onAddTask, onDrop, children }) {
                     backgroundSize: '24px 24px',
                     backgroundPosition: 'center center',
                     backgroundColor: 'transparent', // Handled by parent for dark mode
+                    transform: `scale(${zoom})`,
+                    transformOrigin: 'center center',
+                    transition: 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
                 }}
             >
                 {/* Axis Lines (Background) */}
