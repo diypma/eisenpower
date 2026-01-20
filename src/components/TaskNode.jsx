@@ -114,18 +114,6 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
             >
                 <div className="flex items-start justify-between gap-2">
                     <span className={`leading-tight ${isSubtaskNode ? 'text-xs' : ''}`}>{task.text}</span>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation()
-                            onDelete(task.id)
-                        }}
-                        className={`
-                            opacity-0 group-hover:opacity-100 transition-opacity text-xl leading-none
-                            ${isSubtaskNode ? 'text-slate-400 hover:text-red-500' : 'text-white/80 hover:text-white'}
-                        `}
-                    >
-                        ×
-                    </button>
                 </div>
                 {!isSubtaskNode && (
                     <div className="mt-1 flex justify-between items-center text-[10px] opacity-80 pt-1 border-t border-white/20">

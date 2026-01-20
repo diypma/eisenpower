@@ -96,7 +96,22 @@ function App() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
   }
 
-  const expandedTask = tasks.find(t => t.id === expandedTaskId)
+  const handleSubtaskDrop = (x, y, data) => {
+    if (data.type === 'SUBTASK_EXTRACT') {
+      setTasks(prev => prev.map(t => {
+        if (t.id === data.taskId) {
+          return {
+            ...t,
+            subtasks: t.subtasks.map(s =>
+              s.id === data.subtaskId ? { ...s, x, y } : s
+            )
+          }
+        }
+        return t
+      }))
+      setExpandedTaskId(null)
+    }
+  }
 
   return (
     <div className={`h-screen bg-white dark:bg-slate-900 font-sans text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200`}>
@@ -106,7 +121,6 @@ function App() {
           Eisenpower
         </h1>
         <div className="flex items-center gap-4">
-          {/* Settings Menu */}
           <SettingsMenu
             tasks={tasks}
             isDark={theme === 'dark'}
@@ -121,24 +135,7 @@ function App() {
           <div className="absolute inset-8" ref={graphContainerRef}>
             <GraphPaper
               onAddTask={handleOpenModal}
-              onDrop={(x, y, data) => {
-                if (data.type === 'SUBTASK_EXTRACT') {
-                  // Update subtask with x, y coordinates
-                  setTasks(prev => prev.map(t => {
-                    if (t.id === data.taskId) {
-                      return {
-                        ...t,
-                        subtasks: t.subtasks.map(s =>
-                          s.id === data.subtaskId ? { ...s, x, y } : s
-                        )
-                      }
-                    }
-                    return t
-                  }))
-                  // Close modal if extracting
-                  setExpandedTaskId(null)
-                }
-              }}
+              onDrop={handleSubtaskDrop}
               connections={tasks.flatMap(t =>
                 (t.subtasks || [])
                   .filter(s => s.x !== undefined && s.x !== null)
@@ -169,7 +166,6 @@ function App() {
                       key={sub.id}
                       task={{ ...sub, isSubtask: true, parentId: task.id }}
                       onMove={(id, x, y) => {
-                        // Move subtask
                         setTasks(prev => prev.map(t => {
                           if (t.id === task.id) {
                             return {
@@ -183,8 +179,6 @@ function App() {
                         }))
                       }}
                       onDelete={(id) => {
-                        // Just remove position, don't delete subtask entirely (or ask user?)
-                        // For now, let's treat 'delete' on a subtask node as un-positioning it
                         setTasks(prev => prev.map(t => {
                           if (t.id === task.id) {
                             return {
@@ -198,7 +192,6 @@ function App() {
                         }))
                       }}
                       onExpand={() => {
-                        // Maybe open parent? or nothing for now
                         setExpandedTaskId(task.id)
                       }}
                       containerRef={graphContainerRef}
@@ -229,7 +222,7 @@ function App() {
 
       <TaskDetailModal
         isOpen={!!expandedTaskId}
-        task={expandedTask}
+        task={tasks.find(t => t.id === expandedTaskId)}
         onClose={() => setExpandedTaskId(null)}
         onToggleSubtask={toggleSubtask}
         onDelete={deleteTask}
@@ -245,8 +238,10 @@ function App() {
           }))
         }}
         onSubtaskDragStart={(taskId, subtask) => {
-          // Optional: Tracking logic if needed
+          // Track
         }}
+        onDrop={handleSubtaskDrop}
+        gridRef={graphContainerRef}
       />
     </div>
   )

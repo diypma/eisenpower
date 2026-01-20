@@ -1,13 +1,30 @@
 import { useEffect, useState } from 'react'
 
-export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask, onDelete, onSubtaskDragStart, onAddSubtask }) {
+export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask, onDelete, onSubtaskDragStart, onAddSubtask, onDrop, gridRef }) {
     const [isAdding, setIsAdding] = useState(false)
     const [newSubtaskText, setNewSubtaskText] = useState('')
 
-    // ... (existing handlers)
-
     const handleBackdropClick = (e) => {
         if (e.target === e.currentTarget) onClose()
+    }
+
+    const handleDrop = (e) => {
+        e.preventDefault()
+        if (!onDrop || !gridRef.current) return
+
+        const rect = gridRef.current.getBoundingClientRect()
+        const x = ((e.clientX - rect.left) / rect.width) * 100
+        const y = ((rect.height - (e.clientY - rect.top)) / rect.height) * 100
+
+        try {
+            const json = e.dataTransfer.getData('application/json')
+            if (json) {
+                const data = JSON.parse(json)
+                onDrop(x, y, data)
+            }
+        } catch (err) {
+            console.error(err)
+        }
     }
 
     // Handle Escape key
@@ -34,7 +51,6 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
         if (newSubtaskText.trim()) {
             onAddSubtask(task.id, newSubtaskText.trim())
             setNewSubtaskText('')
-            // Keep input open for rapid entry, or close it? Let's keep it open but focused.
         }
     }
 
@@ -42,6 +58,8 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
         <div
             className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm animate-in fade-in transition-all"
             onClick={handleBackdropClick}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
         >
             <div className="bg-white dark:bg-slate-800 rounded-[32px] shadow-2xl w-full max-w-lg p-10 animate-in zoom-in-95 duration-200 border border-transparent dark:border-slate-700">
                 <div className="flex justify-between items-start mb-6">
