@@ -17,6 +17,16 @@
 
 body {
   @apply bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200;
+  touch-action: pan-x pan-y;
+  /* Allow scrolling but we override on draggable el */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent text selection during drag on touch devices */
+.select-none {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Custom Scrollbar for better aesthetics */

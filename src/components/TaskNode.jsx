@@ -56,6 +56,9 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
         }
 
         const handleMouseUp = (e) => {
+            const clientX = e.clientX || (e.changedTouches ? e.changedTouches[0].clientX : 0)
+            const clientY = e.clientY || (e.changedTouches ? e.changedTouches[0].clientY : 0)
+
             setIsDragging(false)
 
             const duration = Date.now() - dragRef.current.startTime
@@ -70,10 +73,10 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
             // Check if dropped on parent (for sub-tasks)
             if (isSubtaskNode && task.parentId && onReturnSubtask) {
                 // Hide self temporarily so we can click "through" to find parent
-                const selfNode = e.target.closest('.task-node')
+                const selfNode = document.querySelector(`[data-task-id="${task.id}"]`)
                 if (selfNode) selfNode.style.display = 'none'
 
-                const elements = document.elementsFromPoint(e.clientX, e.clientY)
+                const elements = document.elementsFromPoint(clientX, clientY)
                 const parentNode = elements.find(el => {
                     const id = el.getAttribute('data-task-id')
                     // Ensure we found a task node that IS the parent
@@ -88,31 +91,68 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
             }
         }
 
+        const handleTouchMove = (e) => {
+            if (!containerRef.current) return
+            e.preventDefault() // Constructive default for touch
+
+            const touch = e.touches[0]
+
+            const rect = containerRef.current.getBoundingClientRect()
+            const deltaX = touch.clientX - dragRef.current.startX
+            const deltaY = touch.clientY - dragRef.current.startY
+
+            // Track movement distance
+            dragRef.current.totalDist = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+
+            // Calculate new percentage based on movement
+            const newX = dragRef.current.initialTaskX + (deltaX / rect.width) * 100
+            const newY = dragRef.current.initialTaskY - (deltaY / rect.height) * 100
+
+            // Clamp to 0-100
+            const clampedX = Math.max(0, Math.min(100, newX))
+            const clampedY = Math.max(0, Math.min(100, newY))
+
+            onMoveRef.current(task.id, clampedX, clampedY)
+        }
+
         window.addEventListener('mousemove', handleMouseMove)
         window.addEventListener('mouseup', handleMouseUp)
+        window.addEventListener('touchmove', handleTouchMove, { passive: false })
+        window.addEventListener('touchend', handleMouseUp)
 
         return () => {
             window.removeEventListener('mousemove', handleMouseMove)
             window.removeEventListener('mouseup', handleMouseUp)
+            window.removeEventListener('touchmove', handleTouchMove)
+            window.removeEventListener('touchend', handleMouseUp)
         }
     }, [isDragging, task.id, containerRef, onExpand])
 
     const handleMouseDown = (e) => {
         // Only drag with left click and ignore if clicking delete button
-        if (e.button !== 0 || e.target.closest('button')) return
+        if ((e.type === 'mousedown' && e.button !== 0) || e.target.closest('button')) return
+
+        const clientX = e.clientX || e.touches[0].clientX
+        const clientY = e.clientY || e.touches[0].clientY
 
         setIsDragging(true)
         dragRef.current = {
-            startX: e.clientX,
-            startY: e.clientY,
+            startX: clientX,
+            startY: clientY,
             initialTaskX: task.x,
             initialTaskY: task.y,
             startTime: Date.now(),
             totalDist: 0
         }
 
-        e.preventDefault()
-        e.stopPropagation()
+        // Prevent default only for touch to stop scrolling, but allow mouse for clicking inputs
+        if (e.type === 'touchstart') {
+            e.stopPropagation()
+            // e.preventDefault() is often needed but can block clicks, handled carefully
+        } else {
+            e.preventDefault()
+            e.stopPropagation()
+        }
     }
 
     const subtaskCount = task.subtasks?.length || 0
@@ -125,19 +165,21 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
                 : 'z-10 hover:scale-105 transition-all duration-200'
                 } ${isHighlighted ? 'ring-4 ring-offset-2 rounded-2xl' : ''
                 }`}
+            onMouseDown={handleMouseDown}
+            onTouchStart={handleMouseDown}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
+            data-task-id={task.id}
             style={{
                 left: `${task.x}%`,
                 bottom: `${task.y}%`,
                 transform: 'translate(-50%, 50%)',
+                touchAction: 'none', // Crucial for preventing scroll while dragging
                 ...(isHighlighted ? {
                     '--tw-ring-color': accentColor.glow,
                     '--tw-ring-offset-color': 'transparent'
                 } : {})
             }}
-            onMouseDown={handleMouseDown}
-            onMouseEnter={onMouseEnter}
-            onMouseLeave={onMouseLeave}
-            data-task-id={task.id}
         >
             <div
                 className={`

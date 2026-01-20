@@ -29,8 +29,20 @@ export default function GraphPaper({ onAddTask, onDrop, children }) {
     }
 
     const handleClick = (e) => {
-        // Explicitly ignore if clicking inside a task node
-        if (e.target.closest('.task-node')) {
+        // Use client coordinates falling back to touch
+        let clientX, clientY
+
+        if (e.type === 'touchend') {
+            // Touchend doesn't have client coordinates, use changedTouches
+            clientX = e.changedTouches[0].clientX
+            clientY = e.changedTouches[0].clientY
+        } else {
+            clientX = e.clientX
+            clientY = e.clientY
+        }
+
+        // Explicitly ignore if clicking inside a task node (or button within it)
+        if (e.target.closest('.task-node') || e.target.closest('button')) {
             return
         }
 
@@ -39,8 +51,8 @@ export default function GraphPaper({ onAddTask, onDrop, children }) {
         if (!isGridClick) return
 
         const rect = containerRef.current.getBoundingClientRect()
-        const x = ((e.clientX - rect.left) / rect.width) * 100
-        const y = ((rect.height - (e.clientY - rect.top)) / rect.height) * 100
+        const x = ((clientX - rect.left) / rect.width) * 100
+        const y = ((rect.height - (clientY - rect.top)) / rect.height) * 100
 
         onAddTask(x, y)
     }
