@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import GraphPaper from './components/GraphPaper'
 import TaskNode from './components/TaskNode'
 import PriorityPanel from './components/PriorityPanel'
@@ -6,20 +6,32 @@ import TaskModal from './components/TaskModal'
 import TaskDetailModal from './components/TaskDetailModal'
 
 function App() {
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      text: 'Launch Eisenpower',
-      x: 75,
-      y: 85,
-      subtasks: [
-        { id: 101, text: 'Fix drag and drop', completed: true },
-        { id: 102, text: 'Implement click-to-add', completed: true },
-        { id: 103, text: 'Task detail expansion', completed: false }
+  const [tasks, setTasks] = useState(() => {
+    try {
+      const saved = localStorage.getItem('eisenpower-tasks')
+      return saved ? JSON.parse(saved) : [
+        {
+          id: 1,
+          text: 'Launch Eisenpower',
+          x: 75,
+          y: 85,
+          subtasks: [
+            { id: 101, text: 'Fix drag and drop', completed: true },
+            { id: 102, text: 'Implement click-to-add', completed: true },
+            { id: 103, text: 'Task detail expansion', completed: true }
+          ]
+        },
+        { id: 2, text: 'Plan next features', x: 25, y: 75, subtasks: [] },
       ]
-    },
-    { id: 2, text: 'Plan next features', x: 25, y: 75, subtasks: [] },
-  ])
+    } catch (e) {
+      console.error('Failed to parse tasks', e)
+      return []
+    }
+  })
+
+  useEffect(() => {
+    localStorage.setItem('eisenpower-tasks', JSON.stringify(tasks))
+  }, [tasks])
 
   const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
   const [expandedTaskId, setExpandedTaskId] = useState(null)
