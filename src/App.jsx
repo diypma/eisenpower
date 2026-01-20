@@ -37,7 +37,6 @@ function App() {
     if (pendingPosition) {
       handleAddTask(pendingPosition.x, pendingPosition.y)
     } else {
-      // Default position if no click yet
       handleAddTask(50, 50)
     }
   }
@@ -53,42 +52,33 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
-      {/* Header */}
-      <header className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row justify-between items-center gap-6">
-        <div>
-          <h1 className="text-5xl font-black tracking-tight bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 bg-clip-text text-transparent">
-            Eisenpower
-          </h1>
-          <p className="mt-2 text-slate-500 font-medium">
-            {pendingPosition
-              ? 'Type your task and press Enter'
-              : 'Type a task, then click on the graph to place it'}
-          </p>
-        </div>
+    <div className="h-screen bg-slate-50 font-sans text-slate-900 flex flex-col overflow-hidden">
+      {/* Compact Header */}
+      <header className="px-6 py-3 flex justify-between items-center border-b border-slate-200 bg-white/80 backdrop-blur-sm">
+        <h1 className="text-xl font-black tracking-tight bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 bg-clip-text text-transparent">
+          Eisenpower
+        </h1>
 
-        <form onSubmit={handleInputSubmit} className="flex w-full md:w-auto gap-2 p-2 bg-white rounded-2xl shadow-sm border border-slate-200">
+        <form onSubmit={handleInputSubmit} className="flex gap-2">
           <input
             type="text"
             placeholder="New task..."
-            className="flex-1 px-4 py-2 outline-none min-w-[250px]"
+            className="px-4 py-2 rounded-xl border border-slate-200 outline-none focus:border-indigo-400 min-w-[200px]"
             value={newTaskText}
             onChange={(e) => setNewTaskText(e.target.value)}
-            autoFocus
           />
           <button
             type="submit"
-            className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+            className="bg-indigo-600 text-white px-5 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-colors"
           >
             Add
           </button>
         </form>
       </header>
 
-      <main className="max-w-[1800px] mx-auto px-6 grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-
+      <main className="flex-1 flex gap-6 p-6 overflow-hidden">
         {/* Graph Paper Matrix */}
-        <div className="lg:col-span-3 pl-12 pb-12 pt-12">
+        <div className="flex-1 pr-20">
           <GraphPaper onAddTask={handleAddTask}>
             {tasks.map(task => (
               <TaskNode
@@ -103,7 +93,7 @@ function App() {
         </div>
 
         {/* Priority Panel */}
-        <div className="lg:col-span-1">
+        <div className="w-80 flex-shrink-0">
           <PriorityPanel tasks={tasks} />
         </div>
       </main>
