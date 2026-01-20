@@ -234,6 +234,7 @@ function App() {
                       onMouseEnter={() => setHoveredTaskFamily(task.id)}
                       onMouseLeave={() => setHoveredTaskFamily(null)}
                       isHighlighted={hoveredTaskFamily === task.id}
+                      onReturnSubtask={handleReturnSubtask}
                     />
                   ))
               })}

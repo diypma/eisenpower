@@ -64,6 +64,27 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
             // Threshold: < 200ms and < 5px distance = Click (Expand)
             if (duration < 250 && distance < 6) {
                 onExpand(task.id)
+                return
+            }
+
+            // Check if dropped on parent (for sub-tasks)
+            if (isSubtaskNode && task.parentId && onReturnSubtask) {
+                // Hide self temporarily so we can click "through" to find parent
+                const selfNode = e.target.closest('.task-node')
+                if (selfNode) selfNode.style.display = 'none'
+
+                const elements = document.elementsFromPoint(e.clientX, e.clientY)
+                const parentNode = elements.find(el => {
+                    const id = el.getAttribute('data-task-id')
+                    // Ensure we found a task node that IS the parent
+                    return id && parseInt(id) === task.parentId
+                })
+
+                if (selfNode) selfNode.style.display = ''
+
+                if (parentNode) {
+                    onReturnSubtask(task.parentId, task.id)
+                }
             }
         }
 
@@ -97,32 +118,6 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
     const subtaskCount = task.subtasks?.length || 0
     const completedCount = task.subtasks?.filter(s => s.completed)?.length || 0
 
-    // Handle drop for parent tasks (to accept sub-tasks being returned)
-    const handleDragOver = (e) => {
-        if (isSubtaskNode) return // Only parent tasks accept drops
-        e.preventDefault()
-        e.stopPropagation()
-    }
-
-    const handleDrop = (e) => {
-        if (isSubtaskNode) return // Only parent tasks accept drops
-        e.preventDefault()
-        e.stopPropagation()
-
-        try {
-            const json = e.dataTransfer.getData('application/json')
-            if (json) {
-                const data = JSON.parse(json)
-                // Check if this is a sub-task being returned to its parent
-                if (data.type === 'SUBTASK_MOVE' && data.parentId === task.id && onReturnSubtask) {
-                    onReturnSubtask(task.id, data.subtaskId)
-                }
-            }
-        } catch (err) {
-            console.error(err)
-        }
-    }
-
     return (
         <div
             className={`absolute task-node pointer-events-auto cursor-grab active:cursor-grabbing select-none ${isDragging
@@ -142,20 +137,7 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
             onMouseDown={handleMouseDown}
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            draggable={isSubtaskNode}
-            onDragStart={(e) => {
-                if (isSubtaskNode && task.parentId) {
-                    e.dataTransfer.setData('application/json', JSON.stringify({
-                        type: 'SUBTASK_MOVE',
-                        parentId: task.parentId,
-                        subtaskId: task.id,
-                        text: task.text
-                    }))
-                    e.dataTransfer.effectAllowed = 'move'
-                }
-            }}
+            data-task-id={task.id}
         >
             <div
                 className={`
