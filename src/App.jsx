@@ -50,6 +50,7 @@ function App() {
 
   const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
   const [expandedTaskId, setExpandedTaskId] = useState(null)
+  const [hoveredTaskFamily, setHoveredTaskFamily] = useState(null) // Track parent ID for highlighting
   const graphContainerRef = useRef(null)
 
   const handleOpenModal = (x, y) => {
@@ -146,6 +147,9 @@ function App() {
                   onDelete={deleteTask}
                   onExpand={setExpandedTaskId}
                   containerRef={graphContainerRef}
+                  onMouseEnter={() => setHoveredTaskFamily(task.id)}
+                  onMouseLeave={() => setHoveredTaskFamily(null)}
+                  isHighlighted={hoveredTaskFamily === task.id}
                 />
               ))}
 
@@ -190,6 +194,9 @@ function App() {
                       containerRef={graphContainerRef}
                       isSubtaskNode={true}
                       parentAccentColor={parentAccentColor}
+                      onMouseEnter={() => setHoveredTaskFamily(task.id)}
+                      onMouseLeave={() => setHoveredTaskFamily(null)}
+                      isHighlighted={hoveredTaskFamily === task.id}
                     />
                   ))
               })}

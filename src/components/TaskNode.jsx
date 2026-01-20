@@ -9,7 +9,7 @@ function getPriorityColor(score) {
     return 'from-slate-300 to-slate-400'
 }
 
-export default function TaskNode({ task, onMove, onDelete, onExpand, containerRef, isSubtaskNode = false, parentAccentColor = null }) {
+export default function TaskNode({ task, onMove, onDelete, onExpand, containerRef, isSubtaskNode = false, parentAccentColor = null, onMouseEnter, onMouseLeave, isHighlighted = false }) {
     const [isDragging, setIsDragging] = useState(false)
     const dragRef = useRef({
         startX: 0,
@@ -99,13 +99,21 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
 
     return (
         <div
-            className={`absolute task-node pointer-events-auto cursor-grab active:cursor-grabbing select-none ${isDragging ? 'z-50 scale-110 shadow-2xl' : 'z-10 transition-all duration-300 hover:scale-105'}`}
+            className={`absolute task-node pointer-events-auto cursor-grab active:cursor-grabbing select-none transition-all duration-200 ${isDragging ? 'z-50 scale-110 shadow-2xl' : 'z-10 hover:scale-105'
+                } ${isHighlighted ? 'ring-4 ring-offset-2' : ''
+                }`}
             style={{
                 left: `${task.x}%`,
                 bottom: `${task.y}%`,
                 transform: 'translate(-50%, 50%)',
+                ...(isHighlighted ? {
+                    '--tw-ring-color': accentColor.glow,
+                    '--tw-ring-offset-color': 'transparent'
+                } : {})
             }}
             onMouseDown={handleMouseDown}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
         >
             <div
                 className={`
