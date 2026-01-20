@@ -81,7 +81,7 @@ function App() {
   const expandedTask = tasks.find(t => t.id === expandedTaskId)
 
   return (
-    <div className="h-screen bg-white font-sans text-slate-900 flex flex-col overflow-hidden">
+    <div className="h-screen bg-white font-sans text-slate-900 flex flex-col">
       {/* Ultra Compact Header */}
       <header className="px-8 py-4 flex justify-between items-center bg-white">
         <h1 className="text-xl font-black tracking-tighter bg-gradient-to-br from-indigo-600 to-violet-700 bg-clip-text text-transparent">
@@ -92,7 +92,7 @@ function App() {
         </div>
       </header>
 
-      <main className="flex-1 flex gap-8 p-8 overflow-hidden bg-slate-50/50">
+      <main className="flex-1 flex gap-8 p-8 bg-slate-50/50">
         {/* Graph Paper Matrix */}
         <div className="flex-1 bg-white rounded-[32px] border border-slate-100 shadow-sm relative pr-20 p-8">
           <div className="absolute inset-8" ref={graphContainerRef}>

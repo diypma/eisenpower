@@ -26,16 +26,22 @@ export default function GraphPaper({ onAddTask, children }) {
             <div
                 ref={containerRef}
                 onClick={handleClick}
-                className="relative w-full h-full graph-clickable cursor-crosshair overflow-hidden"
+                className="relative w-full h-full graph-clickable cursor-crosshair"
                 style={{
                     backgroundImage: `radial-gradient(circle, #e2e8f0 1px, transparent 1px)`,
                     backgroundSize: '24px 24px',
+                    backgroundPosition: 'center center',
                     backgroundColor: '#f8fafc',
                 }}
             >
                 {/* Axis Lines (Background) */}
-                <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute inset-0 pointer-events-none select-none">
+                    {/* Vertical Axis with background mask */}
+                    <div className="absolute left-1/2 top-0 bottom-0 w-[4px] -ml-[2px] bg-[#f8fafc]" />
                     <div className="absolute left-1/2 top-0 bottom-0 w-px bg-slate-300/30" />
+
+                    {/* Horizontal Axis with background mask */}
+                    <div className="absolute top-1/2 left-0 right-0 h-[4px] -mt-[2px] bg-[#f8fafc]" />
                     <div className="absolute top-1/2 left-0 right-0 h-px bg-slate-300/30" />
                 </div>
 
