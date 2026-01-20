@@ -2,101 +2,108 @@ import { useState, useRef } from 'react'
 import GraphPaper from './components/GraphPaper'
 import TaskNode from './components/TaskNode'
 import PriorityPanel from './components/PriorityPanel'
+import TaskModal from './components/TaskModal'
 
 function App() {
   const [tasks, setTasks] = useState([
-    { id: 1, text: 'Launch Eisenpower', x: 75, y: 85 },
-    { id: 2, text: 'Plan next features', x: 25, y: 75 },
-    { id: 3, text: 'Check email', x: 65, y: 30 },
+    {
+      id: 1,
+      text: 'Launch Eisenpower',
+      x: 75,
+      y: 85,
+      subtasks: [
+        { id: 101, text: 'Fix drag and drop', completed: true },
+        { id: 102, text: 'Implement click-to-add', completed: false }
+      ]
+    },
+    { id: 2, text: 'Plan next features', x: 25, y: 75, subtasks: [] },
   ])
-  const [newTaskText, setNewTaskText] = useState('')
-  const [pendingPosition, setPendingPosition] = useState(null)
+
+  const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
   const graphContainerRef = useRef(null)
 
-  const handleAddTask = (x, y) => {
-    if (!newTaskText.trim()) {
-      setPendingPosition({ x, y })
-      return
-    }
-
-    const newTask = {
-      id: Date.now(),
-      text: newTaskText,
-      x,
-      y,
-    }
-    setTasks([...tasks, newTask])
-    setNewTaskText('')
-    setPendingPosition(null)
+  const handleOpenModal = (x, y) => {
+    setModalState({ isOpen: true, x, y })
   }
 
-  const handleInputSubmit = (e) => {
-    e.preventDefault()
-    if (!newTaskText.trim()) return
-
-    if (pendingPosition) {
-      handleAddTask(pendingPosition.x, pendingPosition.y)
-    } else {
-      handleAddTask(50, 50)
+  const handleCreateTask = ({ text, subtasks }) => {
+    const newTask = {
+      id: Date.now(),
+      text,
+      x: modalState.x,
+      y: modalState.y,
+      subtasks: subtasks.map((s, i) => ({ ...s, id: Date.now() + i }))
     }
+    setTasks([...tasks, newTask])
+    setModalState({ ...modalState, isOpen: false })
   }
 
   const moveTask = (id, x, y) => {
-    setTasks(tasks.map(task =>
+    setTasks(prev => prev.map(task =>
       task.id === id ? { ...task, x, y } : task
     ))
   }
 
   const deleteTask = (id) => {
-    setTasks(tasks.filter(t => t.id !== id))
+    setTasks(prev => prev.filter(t => t.id !== id))
+  }
+
+  const toggleSubtask = (taskId, subtaskId) => {
+    setTasks(prev => prev.map(task => {
+      if (task.id === taskId) {
+        return {
+          ...task,
+          subtasks: task.subtasks.map(s =>
+            s.id === subtaskId ? { ...s, completed: !s.completed } : s
+          )
+        }
+      }
+      return task
+    }))
   }
 
   return (
-    <div className="h-screen bg-slate-50 font-sans text-slate-900 flex flex-col overflow-hidden">
-      {/* Compact Header */}
-      <header className="px-6 py-3 flex justify-between items-center border-b border-slate-200 bg-white/80 backdrop-blur-sm">
-        <h1 className="text-xl font-black tracking-tight bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 bg-clip-text text-transparent">
+    <div className="h-screen bg-white font-sans text-slate-900 flex flex-col overflow-hidden">
+      {/* Ultra Compact Header */}
+      <header className="px-8 py-4 flex justify-between items-center bg-white">
+        <h1 className="text-xl font-black tracking-tighter bg-gradient-to-br from-indigo-600 to-violet-700 bg-clip-text text-transparent">
           Eisenpower
         </h1>
-
-        <form onSubmit={handleInputSubmit} className="flex gap-2">
-          <input
-            type="text"
-            placeholder="New task..."
-            className="px-4 py-2 rounded-xl border border-slate-200 outline-none focus:border-indigo-400 min-w-[200px]"
-            value={newTaskText}
-            onChange={(e) => setNewTaskText(e.target.value)}
-          />
-          <button
-            type="submit"
-            className="bg-indigo-600 text-white px-5 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-colors"
-          >
-            Add
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          {/* Add any global actions here */}
+        </div>
       </header>
 
-      <main className="flex-1 flex gap-6 p-6 overflow-hidden">
+      <main className="flex-1 flex gap-8 p-8 overflow-hidden bg-slate-50/50">
         {/* Graph Paper Matrix */}
-        <div className="flex-1 pr-20">
-          <GraphPaper onAddTask={handleAddTask}>
-            {tasks.map(task => (
-              <TaskNode
-                key={task.id}
-                task={task}
-                onMove={moveTask}
-                onDelete={deleteTask}
-                containerRef={graphContainerRef}
-              />
-            ))}
-          </GraphPaper>
+        <div className="flex-1 bg-white rounded-[32px] border border-slate-100 shadow-sm relative pr-20 p-8">
+          <div className="absolute inset-8" ref={graphContainerRef}>
+            <GraphPaper onAddTask={handleOpenModal}>
+              {tasks.map(task => (
+                <TaskNode
+                  key={task.id}
+                  task={task}
+                  onMove={moveTask}
+                  onDelete={deleteTask}
+                  containerRef={graphContainerRef}
+                />
+              ))}
+            </GraphPaper>
+          </div>
         </div>
 
         {/* Priority Panel */}
-        <div className="w-80 flex-shrink-0">
-          <PriorityPanel tasks={tasks} />
+        <div className="w-[320px] flex-shrink-0 flex flex-col h-full">
+          <PriorityPanel tasks={tasks} onToggleSubtask={toggleSubtask} />
         </div>
       </main>
+
+      <TaskModal
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState({ ...modalState, isOpen: false })}
+        onSubmit={handleCreateTask}
+        position={modalState}
+      />
     </div>
   )
 }
