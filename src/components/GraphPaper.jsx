@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 
-export default function GraphPaper({ onAddTask, onDrop, connections, children }) {
+export default function GraphPaper({ onAddTask, onDrop, children }) {
     const containerRef = useRef(null)
 
     const handleDragOver = (e) => {
@@ -80,22 +80,6 @@ export default function GraphPaper({ onAddTask, onDrop, connections, children })
                     ↑ Importance
                 </div>
 
-                {/* Connection Lines (Behind labels/nodes but above background) */}
-                <svg className="absolute inset-0 pointer-events-none w-full h-full z-10">
-                    {connections?.map((conn) => (
-                        <line
-                            key={conn.id}
-                            x1={`${conn.start.x}%`}
-                            y1={`${100 - conn.start.y}%`}
-                            x2={`${conn.end.x}%`}
-                            y2={`${100 - conn.end.y}%`}
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeDasharray="4 4"
-                            className="text-indigo-300 dark:text-indigo-700 opacity-50 transition-all duration-300"
-                        />
-                    ))}
-                </svg>
 
                 {/* Quadrant Labels */}
                 <div className="absolute top-6 right-6 text-[10px] font-black text-slate-300/40 dark:text-slate-600/40 uppercase tracking-[0.2em] pointer-events-none select-none z-0">Do First</div>

@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
+import { getTaskAccentColor } from '../utils/colorUtils'
 
 function getPriorityColor(score) {
     if (score >= 80) return 'from-red-400 to-orange-400'
@@ -8,7 +9,7 @@ function getPriorityColor(score) {
     return 'from-slate-300 to-slate-400'
 }
 
-export default function TaskNode({ task, onMove, onDelete, onExpand, containerRef, isSubtaskNode = false }) {
+export default function TaskNode({ task, onMove, onDelete, onExpand, containerRef, isSubtaskNode = false, parentAccentColor = null }) {
     const [isDragging, setIsDragging] = useState(false)
     const dragRef = useRef({
         startX: 0,
@@ -24,6 +25,11 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
     onMoveRef.current = onMove
 
     const priority = (task.y * 0.6) + (task.x * 0.4)
+
+    // Get accent color for this task (or use parent's if it's a subtask)
+    const accentColor = isSubtaskNode && parentAccentColor
+        ? parentAccentColor
+        : getTaskAccentColor(task.parentId || task.id)
 
     useEffect(() => {
         if (!isDragging) return
@@ -103,15 +109,26 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
         >
             <div
                 className={`
-          rounded-2xl shadow-lg
+          rounded-2xl shadow-lg relative
           ${isSubtaskNode
-                        ? 'p-2 min-w-[100px] max-w-[150px] bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-2 border-indigo-400/50'
+                        ? 'p-2 min-w-[100px] max-w-[150px] bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-2'
                         : `p-3 min-w-[140px] max-w-[200px] bg-gradient-to-br ${getPriorityColor(priority)} text-white border-2 border-white/30`
                     }
           font-semibold text-sm
           ${isDragging ? 'ring-4 ring-indigo-200/50' : 'hover:shadow-xl'}
         `}
+                style={isSubtaskNode ? {
+                    borderLeftColor: accentColor.border,
+                    borderLeftWidth: '4px'
+                } : {}}
             >
+                {/* Accent pip for parent tasks */}
+                {!isSubtaskNode && (
+                    <div
+                        className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900"
+                        style={{ backgroundColor: accentColor.light }}
+                    />
+                )}
                 <div className="flex items-start justify-between gap-2">
                     <span className={`leading-tight ${isSubtaskNode ? 'text-xs' : ''}`}>{task.text}</span>
                 </div>

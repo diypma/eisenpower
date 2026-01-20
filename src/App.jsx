@@ -5,6 +5,7 @@ import PriorityPanel from './components/PriorityPanel'
 import TaskModal from './components/TaskModal'
 import TaskDetailModal from './components/TaskDetailModal'
 import SettingsMenu from './components/SettingsMenu'
+import { getTaskAccentColor } from './utils/colorUtils'
 
 function App() {
   const [tasks, setTasks] = useState(() => {
@@ -136,15 +137,6 @@ function App() {
             <GraphPaper
               onAddTask={handleOpenModal}
               onDrop={handleSubtaskDrop}
-              connections={tasks.flatMap(t =>
-                (t.subtasks || [])
-                  .filter(s => s.x !== undefined && s.x !== null)
-                  .map(s => ({
-                    id: `${t.id}-${s.id}`,
-                    start: { x: t.x, y: t.y },
-                    end: { x: s.x, y: s.y }
-                  }))
-              )}
             >
               {tasks.map(task => (
                 <TaskNode
@@ -158,8 +150,9 @@ function App() {
               ))}
 
               {/* Positioned Sub-tasks */}
-              {tasks.flatMap(task =>
-                (task.subtasks || [])
+              {tasks.flatMap(task => {
+                const parentAccentColor = getTaskAccentColor(task.id)
+                return (task.subtasks || [])
                   .filter(sub => sub.x !== undefined && sub.x !== null)
                   .map(sub => (
                     <TaskNode
@@ -196,9 +189,10 @@ function App() {
                       }}
                       containerRef={graphContainerRef}
                       isSubtaskNode={true}
+                      parentAccentColor={parentAccentColor}
                     />
                   ))
-              )}
+              })}
             </GraphPaper>
           </div>
         </div>
