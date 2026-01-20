@@ -8,7 +8,7 @@ function getPriorityColor(score) {
     return 'from-slate-300 to-slate-400'
 }
 
-export default function TaskNode({ task, onMove, onDelete, onExpand, containerRef }) {
+export default function TaskNode({ task, onMove, onDelete, onExpand, containerRef, isSubtaskNode = false }) {
     const [isDragging, setIsDragging] = useState(false)
     const dragRef = useRef({
         startX: 0,
@@ -103,32 +103,38 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
         >
             <div
                 className={`
-          p-3 rounded-2xl shadow-lg
-          bg-gradient-to-br ${getPriorityColor(priority)}
-          text-white font-semibold text-sm
-          min-w-[140px] max-w-[200px]
-          border-2 border-white/30
+          rounded-2xl shadow-lg
+          ${isSubtaskNode
+                        ? 'p-2 min-w-[100px] max-w-[150px] bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-2 border-indigo-400/50'
+                        : `p-3 min-w-[140px] max-w-[200px] bg-gradient-to-br ${getPriorityColor(priority)} text-white border-2 border-white/30`
+                    }
+          font-semibold text-sm
           ${isDragging ? 'ring-4 ring-indigo-200/50' : 'hover:shadow-xl'}
         `}
             >
                 <div className="flex items-start justify-between gap-2">
-                    <span className="flex-1 leading-tight">{task.text}</span>
+                    <span className={`leading-tight ${isSubtaskNode ? 'text-xs' : ''}`}>{task.text}</span>
                     <button
                         onClick={(e) => {
                             e.stopPropagation()
                             onDelete(task.id)
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-white/80 hover:text-white transition-opacity text-xl leading-none"
+                        className={`
+                            opacity-0 group-hover:opacity-100 transition-opacity text-xl leading-none
+                            ${isSubtaskNode ? 'text-slate-400 hover:text-red-500' : 'text-white/80 hover:text-white'}
+                        `}
                     >
                         ×
                     </button>
                 </div>
-                <div className="mt-1 flex justify-between items-center text-[10px] opacity-80 pt-1 border-t border-white/20">
-                    <span>{priority.toFixed(0)} pts</span>
-                    {subtaskCount > 0 && (
-                        <span>{completedCount}/{subtaskCount} subtasks</span>
-                    )}
-                </div>
+                {!isSubtaskNode && (
+                    <div className="mt-1 flex justify-between items-center text-[10px] opacity-80 pt-1 border-t border-white/20">
+                        <span>{priority.toFixed(0)} pts</span>
+                        {subtaskCount > 0 && (
+                            <span>{completedCount}/{subtaskCount} subtasks</span>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     )

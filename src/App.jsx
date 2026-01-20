@@ -119,7 +119,36 @@ function App() {
         {/* Graph Paper Matrix */}
         <div className="flex-1 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm relative pr-20 p-8 z-0 transition-colors">
           <div className="absolute inset-8" ref={graphContainerRef}>
-            <GraphPaper onAddTask={handleOpenModal}>
+            <GraphPaper
+              onAddTask={handleOpenModal}
+              onDrop={(x, y, data) => {
+                if (data.type === 'SUBTASK_EXTRACT') {
+                  // Update subtask with x, y coordinates
+                  setTasks(prev => prev.map(t => {
+                    if (t.id === data.taskId) {
+                      return {
+                        ...t,
+                        subtasks: t.subtasks.map(s =>
+                          s.id === data.subtaskId ? { ...s, x, y } : s
+                        )
+                      }
+                    }
+                    return t
+                  }))
+                  // Close modal if extracting
+                  setExpandedTaskId(null)
+                }
+              }}
+              connections={tasks.flatMap(t =>
+                (t.subtasks || [])
+                  .filter(s => s.x !== undefined && s.x !== null)
+                  .map(s => ({
+                    id: `${t.id}-${s.id}`,
+                    start: { x: t.x, y: t.y },
+                    end: { x: s.x, y: s.y }
+                  }))
+              )}
+            >
               {tasks.map(task => (
                 <TaskNode
                   key={task.id}
@@ -130,6 +159,53 @@ function App() {
                   containerRef={graphContainerRef}
                 />
               ))}
+
+              {/* Positioned Sub-tasks */}
+              {tasks.flatMap(task =>
+                (task.subtasks || [])
+                  .filter(sub => sub.x !== undefined && sub.x !== null)
+                  .map(sub => (
+                    <TaskNode
+                      key={sub.id}
+                      task={{ ...sub, isSubtask: true, parentId: task.id }}
+                      onMove={(id, x, y) => {
+                        // Move subtask
+                        setTasks(prev => prev.map(t => {
+                          if (t.id === task.id) {
+                            return {
+                              ...t,
+                              subtasks: t.subtasks.map(s =>
+                                s.id === id ? { ...s, x, y } : s
+                              )
+                            }
+                          }
+                          return t
+                        }))
+                      }}
+                      onDelete={(id) => {
+                        // Just remove position, don't delete subtask entirely (or ask user?)
+                        // For now, let's treat 'delete' on a subtask node as un-positioning it
+                        setTasks(prev => prev.map(t => {
+                          if (t.id === task.id) {
+                            return {
+                              ...t,
+                              subtasks: t.subtasks.map(s =>
+                                s.id === id ? { ...s, x: undefined, y: undefined } : s
+                              )
+                            }
+                          }
+                          return t
+                        }))
+                      }}
+                      onExpand={() => {
+                        // Maybe open parent? or nothing for now
+                        setExpandedTaskId(task.id)
+                      }}
+                      containerRef={graphContainerRef}
+                      isSubtaskNode={true}
+                    />
+                  ))
+              )}
             </GraphPaper>
           </div>
         </div>

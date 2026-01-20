@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask, onDelete }) {
+export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask, onDelete, onSubtaskDragStart }) {
     const handleBackdropClick = (e) => {
         if (e.target === e.currentTarget) onClose()
     }
@@ -61,7 +61,20 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
                         {task.subtasks?.map((sub) => (
                             <div
                                 key={sub.id}
-                                className="flex items-center gap-3 group/sub cursor-pointer p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl transition-all"
+                                draggable
+                                onDragStart={(e) => {
+                                    e.stopPropagation();
+                                    // Use standard HTML5 drag for the "ghost" but we'll track drop in App.jsx
+                                    e.dataTransfer.setData('application/json', JSON.stringify({
+                                        type: 'SUBTASK_EXTRACT',
+                                        taskId: task.id,
+                                        subtaskId: sub.id,
+                                        text: sub.text
+                                    }));
+                                    e.dataTransfer.effectAllowed = 'move';
+                                    onSubtaskDragStart?.(task.id, sub);
+                                }}
+                                className="flex items-center gap-3 group/sub cursor-grab active:cursor-grabbing p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl transition-all"
                                 onClick={() => onToggleSubtask(task.id, sub.id)}
                             >
                                 <div className={`
