@@ -4,7 +4,7 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'class', // Enable class-based dark mode
+  darkMode: 'selector', // Tailwind v4 uses 'selector' for class-based dark mode
   theme: {
     extend: {
       fontFamily: {
