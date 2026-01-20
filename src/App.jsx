@@ -85,13 +85,35 @@ function App() {
       if (task.id === taskId) {
         return {
           ...task,
-          subtasks: task.subtasks.map(s =>
-            s.id === subtaskId ? { ...s, completed: !s.completed } : s
-          )
+          subtasks: task.subtasks.map(s => {
+            if (s.id === subtaskId) {
+              const newCompleted = !s.completed
+              // If completing a positioned sub-task, remove it from grid
+              if (newCompleted && s.x !== undefined && s.x !== null) {
+                return { ...s, completed: newCompleted, x: undefined, y: undefined }
+              }
+              return { ...s, completed: newCompleted }
+            }
+            return s
+          })
         }
       }
       return task
     }))
+  }
+
+  const completeTask = (taskId) => {
+    setTasks(prev => prev.map(task => {
+      if (task.id === taskId) {
+        return {
+          ...task,
+          completed: true,
+          completedAt: new Date().toISOString()
+        }
+      }
+      return task
+    }))
+    setExpandedTaskId(null)
   }
 
   const toggleTheme = () => {
@@ -113,6 +135,20 @@ function App() {
       }))
       setExpandedTaskId(null)
     }
+  }
+
+  const handleReturnSubtask = (parentId, subtaskId) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id === parentId) {
+        return {
+          ...t,
+          subtasks: t.subtasks.map(s =>
+            s.id === subtaskId ? { ...s, x: undefined, y: undefined } : s
+          )
+        }
+      }
+      return t
+    }))
   }
 
   return (
@@ -139,7 +175,7 @@ function App() {
               onAddTask={handleOpenModal}
               onDrop={handleSubtaskDrop}
             >
-              {tasks.map(task => (
+              {tasks.filter(task => !task.completed).map(task => (
                 <TaskNode
                   key={task.id}
                   task={task}
@@ -150,14 +186,15 @@ function App() {
                   onMouseEnter={() => setHoveredTaskFamily(task.id)}
                   onMouseLeave={() => setHoveredTaskFamily(null)}
                   isHighlighted={hoveredTaskFamily === task.id}
+                  onReturnSubtask={handleReturnSubtask}
                 />
               ))}
 
               {/* Positioned Sub-tasks */}
-              {tasks.flatMap(task => {
+              {tasks.filter(task => !task.completed).flatMap(task => {
                 const parentAccentColor = getTaskAccentColor(task.id)
                 return (task.subtasks || [])
-                  .filter(sub => sub.x !== undefined && sub.x !== null)
+                  .filter(sub => sub.x !== undefined && sub.x !== null && !sub.completed)
                   .map(sub => (
                     <TaskNode
                       key={sub.id}
@@ -210,6 +247,7 @@ function App() {
             tasks={tasks}
             onToggleSubtask={toggleSubtask}
             onExpandTask={setExpandedTaskId}
+            onCompleteTask={completeTask}
           />
         </div>
       </main>
@@ -227,6 +265,7 @@ function App() {
         onClose={() => setExpandedTaskId(null)}
         onToggleSubtask={toggleSubtask}
         onDelete={deleteTask}
+        onComplete={completeTask}
         onAddSubtask={(taskId, text) => {
           setTasks(prev => prev.map(task => {
             if (task.id === taskId) {

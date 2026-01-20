@@ -9,7 +9,7 @@ function getPriorityColor(score) {
     return 'from-slate-300 to-slate-400'
 }
 
-export default function TaskNode({ task, onMove, onDelete, onExpand, containerRef, isSubtaskNode = false, parentAccentColor = null, onMouseEnter, onMouseLeave, isHighlighted = false }) {
+export default function TaskNode({ task, onMove, onDelete, onExpand, containerRef, isSubtaskNode = false, parentAccentColor = null, onMouseEnter, onMouseLeave, isHighlighted = false, onReturnSubtask }) {
     const [isDragging, setIsDragging] = useState(false)
     const dragRef = useRef({
         startX: 0,
@@ -97,10 +97,38 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
     const subtaskCount = task.subtasks?.length || 0
     const completedCount = task.subtasks?.filter(s => s.completed)?.length || 0
 
+    // Handle drop for parent tasks (to accept sub-tasks being returned)
+    const handleDragOver = (e) => {
+        if (isSubtaskNode) return // Only parent tasks accept drops
+        e.preventDefault()
+        e.stopPropagation()
+    }
+
+    const handleDrop = (e) => {
+        if (isSubtaskNode) return // Only parent tasks accept drops
+        e.preventDefault()
+        e.stopPropagation()
+
+        try {
+            const json = e.dataTransfer.getData('application/json')
+            if (json) {
+                const data = JSON.parse(json)
+                // Check if this is a sub-task being returned to its parent
+                if (data.type === 'SUBTASK_MOVE' && data.parentId === task.id && onReturnSubtask) {
+                    onReturnSubtask(task.id, data.subtaskId)
+                }
+            }
+        } catch (err) {
+            console.error(err)
+        }
+    }
+
     return (
         <div
-            className={`absolute task-node pointer-events-auto cursor-grab active:cursor-grabbing select-none transition-all duration-200 ${isDragging ? 'z-50 scale-110 shadow-2xl' : 'z-10 hover:scale-105'
-                } ${isHighlighted ? 'ring-4 ring-offset-2' : ''
+            className={`absolute task-node pointer-events-auto cursor-grab active:cursor-grabbing select-none ${isDragging
+                ? 'z-50 scale-110 shadow-2xl'
+                : 'z-10 hover:scale-105 transition-all duration-200'
+                } ${isHighlighted ? 'ring-4 ring-offset-2 rounded-2xl' : ''
                 }`}
             style={{
                 left: `${task.x}%`,
@@ -114,6 +142,20 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
             onMouseDown={handleMouseDown}
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            draggable={isSubtaskNode}
+            onDragStart={(e) => {
+                if (isSubtaskNode && task.parentId) {
+                    e.dataTransfer.setData('application/json', JSON.stringify({
+                        type: 'SUBTASK_MOVE',
+                        parentId: task.parentId,
+                        subtaskId: task.id,
+                        text: task.text
+                    }))
+                    e.dataTransfer.effectAllowed = 'move'
+                }
+            }}
         >
             <div
                 className={`

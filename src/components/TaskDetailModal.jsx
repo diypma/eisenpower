@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask, onDelete, onSubtaskDragStart, onAddSubtask, onDrop, gridRef }) {
+export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask, onDelete, onComplete, onSubtaskDragStart, onAddSubtask, onDrop, gridRef }) {
     const [isAdding, setIsAdding] = useState(false)
     const [newSubtaskText, setNewSubtaskText] = useState('')
 
@@ -189,6 +189,16 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
                         className="px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                         Delete Task
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (window.confirm("Mark this task as complete?")) {
+                                onComplete(task.id);
+                            }
+                        }}
+                        className="px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                    >
+                        ✓ Mark Complete
                     </button>
                     <div className="flex-1" />
                     <button

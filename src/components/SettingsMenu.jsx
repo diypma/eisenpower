@@ -19,14 +19,21 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
         content += `Date: ${new Date().toLocaleString()}\n`
         content += "================================\n\n"
 
+        // Separate active and completed tasks
+        const activeTasks = tasks.filter(t => !t.completed)
+        const completedTasks = tasks.filter(t => t.completed)
+
         // Sort by priority logic (same as panel)
-        const sortedTasks = [...tasks].sort((a, b) => {
+        const sortedActive = [...activeTasks].sort((a, b) => {
             const scoreA = (a.y * 0.6) + (a.x * 0.4)
             const scoreB = (b.y * 0.6) + (b.x * 0.4)
             return scoreB - scoreA
         })
 
-        sortedTasks.forEach((task, index) => {
+        content += "ACTIVE TASKS\n"
+        content += "------------\n\n"
+
+        sortedActive.forEach((task, index) => {
             const score = (task.y * 0.6) + (task.x * 0.4)
             content += `${index + 1}. ${task.text} [Score: ${score.toFixed(0)}]\n`
             content += `   Position: Urgency ${task.x.toFixed(0)} / Importance ${task.y.toFixed(0)}\n`
@@ -34,13 +41,31 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
             if (task.subtasks && task.subtasks.length > 0) {
                 task.subtasks.forEach(sub => {
                     const status = sub.completed ? "[x]" : "[ ]"
-                    content += `   - ${status} ${sub.text}\n`
+                    const positioned = (sub.x !== undefined && sub.x !== null) ? " [ON GRID]" : ""
+                    content += `   - ${status} ${sub.text}${positioned}\n`
                 })
             } else {
                 content += `   (No subtasks)\n`
             }
             content += "\n"
         })
+
+        if (completedTasks.length > 0) {
+            content += "\nCOMPLETED TASKS\n"
+            content += "---------------\n\n"
+
+            completedTasks.forEach((task, index) => {
+                const completedDate = task.completedAt ? new Date(task.completedAt).toLocaleDateString() : 'Unknown'
+                content += `${index + 1}. [COMPLETED] ${task.text}\n`
+                content += `   Completed: ${completedDate}\n`
+
+                if (task.subtasks && task.subtasks.length > 0) {
+                    const completedSubs = task.subtasks.filter(s => s.completed).length
+                    content += `   Sub-tasks: ${completedSubs}/${task.subtasks.length} completed\n`
+                }
+                content += "\n"
+            })
+        }
 
         const blob = new Blob([content], { type: "text/plain" })
         const url = URL.createObjectURL(blob)

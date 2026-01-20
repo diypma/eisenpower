@@ -1,10 +1,18 @@
-export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask }) {
-    // Create unified list: main tasks + positioned sub-tasks
+import { useState } from 'react'
+
+export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, onCompleteTask }) {
+    const [showArchive, setShowArchive] = useState(false)
+
+    // Separate active and completed tasks
+    const activeTasks = tasks.filter(t => !t.completed)
+    const completedTasks = tasks.filter(t => t.completed)
+
+    // Create unified list: main tasks + positioned sub-tasks (active only)
     const allItems = [
-        ...tasks.map(t => ({ ...t, type: 'task' })),
-        ...tasks.flatMap(t =>
+        ...activeTasks.map(t => ({ ...t, type: 'task' })),
+        ...activeTasks.flatMap(t =>
             (t.subtasks || [])
-                .filter(s => s.x !== undefined && s.x !== null)
+                .filter(s => s.x !== undefined && s.x !== null && !s.completed)
                 .map(s => ({ ...s, type: 'positioned-subtask', parentId: t.id, parentText: t.text }))
         )
     ]
@@ -18,10 +26,23 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask }) 
 
     // Get IDs of positioned sub-tasks to exclude from nested display
     const positionedSubtaskIds = new Set(
-        tasks.flatMap(t => (t.subtasks || []).filter(s => s.x !== undefined && s.x !== null).map(s => s.id))
+        activeTasks.flatMap(t => (t.subtasks || []).filter(s => s.x !== undefined && s.x !== null).map(s => s.id))
     )
 
     let displayIndex = 0
+
+    const formatRelativeTime = (isoString) => {
+        const date = new Date(isoString)
+        const now = new Date()
+        const diffMs = now - date
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+        if (diffDays === 0) return 'today'
+        if (diffDays === 1) return 'yesterday'
+        if (diffDays < 7) return `${diffDays} days ago`
+        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+        return `${Math.floor(diffDays / 30)} months ago`
+    }
 
     return (
         <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-xl shadow-slate-200/50 dark:shadow-black/20 border border-slate-100 dark:border-slate-700 h-full flex flex-col overflow-hidden transition-colors">
@@ -137,6 +158,50 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask }) 
                         </div>
                         <p className="font-bold text-slate-500 dark:text-slate-500">No tasks mapped</p>
                         <p className="text-xs mt-1 text-slate-300 dark:text-slate-600">Click on the grid paper to add one.</p>
+                    </div>
+                )}
+
+                {/* Archive Section */}
+                {completedTasks.length > 0 && (
+                    <div className="mt-8 pt-6 border-t-2 border-slate-100 dark:border-slate-700">
+                        <button
+                            onClick={() => setShowArchive(!showArchive)}
+                            className="flex items-center gap-2 w-full text-left group mb-4"
+                        >
+                            <svg
+                                className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${showArchive ? 'rotate-90' : ''}`}
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                            <h3 className="text-sm font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                Completed ({completedTasks.length})
+                            </h3>
+                        </button>
+
+                        {showArchive && (
+                            <div className="space-y-3">
+                                {completedTasks.map(task => (
+                                    <div
+                                        key={task.id}
+                                        className="flex items-start gap-3 text-slate-400 dark:text-slate-600 cursor-pointer hover:text-slate-500 dark:hover:text-slate-500 transition-colors"
+                                        onClick={() => onExpandTask(task.id)}
+                                    >
+                                        <svg className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold line-through truncate">{task.text}</p>
+                                            <p className="text-[10px] font-medium mt-0.5">
+                                                completed {formatRelativeTime(task.completedAt)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
