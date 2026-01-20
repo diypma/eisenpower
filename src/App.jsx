@@ -3,6 +3,7 @@ import GraphPaper from './components/GraphPaper'
 import TaskNode from './components/TaskNode'
 import PriorityPanel from './components/PriorityPanel'
 import TaskModal from './components/TaskModal'
+import TaskDetailModal from './components/TaskDetailModal'
 
 function App() {
   const [tasks, setTasks] = useState([
@@ -13,13 +14,15 @@ function App() {
       y: 85,
       subtasks: [
         { id: 101, text: 'Fix drag and drop', completed: true },
-        { id: 102, text: 'Implement click-to-add', completed: false }
+        { id: 102, text: 'Implement click-to-add', completed: true },
+        { id: 103, text: 'Task detail expansion', completed: false }
       ]
     },
     { id: 2, text: 'Plan next features', x: 25, y: 75, subtasks: [] },
   ])
 
   const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
+  const [expandedTaskId, setExpandedTaskId] = useState(null)
   const graphContainerRef = useRef(null)
 
   const handleOpenModal = (x, y) => {
@@ -46,6 +49,7 @@ function App() {
 
   const deleteTask = (id) => {
     setTasks(prev => prev.filter(t => t.id !== id))
+    if (expandedTaskId === id) setExpandedTaskId(null)
   }
 
   const toggleSubtask = (taskId, subtaskId) => {
@@ -61,6 +65,8 @@ function App() {
       return task
     }))
   }
+
+  const expandedTask = tasks.find(t => t.id === expandedTaskId)
 
   return (
     <div className="h-screen bg-white font-sans text-slate-900 flex flex-col overflow-hidden">
@@ -85,6 +91,7 @@ function App() {
                   task={task}
                   onMove={moveTask}
                   onDelete={deleteTask}
+                  onExpand={setExpandedTaskId}
                   containerRef={graphContainerRef}
                 />
               ))}
@@ -94,7 +101,11 @@ function App() {
 
         {/* Priority Panel */}
         <div className="w-[320px] flex-shrink-0 flex flex-col h-full">
-          <PriorityPanel tasks={tasks} onToggleSubtask={toggleSubtask} />
+          <PriorityPanel
+            tasks={tasks}
+            onToggleSubtask={toggleSubtask}
+            onExpandTask={setExpandedTaskId}
+          />
         </div>
       </main>
 
@@ -103,6 +114,14 @@ function App() {
         onClose={() => setModalState({ ...modalState, isOpen: false })}
         onSubmit={handleCreateTask}
         position={modalState}
+      />
+
+      <TaskDetailModal
+        isOpen={!!expandedTaskId}
+        task={expandedTask}
+        onClose={() => setExpandedTaskId(null)}
+        onToggleSubtask={toggleSubtask}
+        onDelete={deleteTask}
       />
     </div>
   )

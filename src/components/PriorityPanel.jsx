@@ -1,4 +1,4 @@
-export default function PriorityPanel({ tasks, onToggleSubtask }) {
+export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask }) {
     const sortedTasks = [...tasks].sort((a, b) => {
         const scoreA = (a.y * 0.6) + (a.x * 0.4)
         const scoreB = (b.y * 0.6) + (b.x * 0.4)
@@ -14,19 +14,22 @@ export default function PriorityPanel({ tasks, onToggleSubtask }) {
                 </span>
             </h2>
 
-            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar">
                 {sortedTasks.map((task, index) => {
                     const score = (task.y * 0.6) + (task.x * 0.4)
                     const hasSubtasks = task.subtasks && task.subtasks.length > 0
 
                     return (
                         <div key={task.id} className="group">
-                            <div className="flex items-start gap-4">
+                            <div
+                                className="flex items-start gap-4 cursor-pointer"
+                                onClick={() => onExpandTask(task.id)}
+                            >
                                 <span className="font-black text-slate-200 text-2xl tabular-nums leading-none pt-1 group-hover:text-indigo-100 transition-colors">
                                     {String(index + 1).padStart(2, '0')}
                                 </span>
                                 <div className="flex-1 min-w-0">
-                                    <p className="font-bold text-slate-800 leading-tight truncate">{task.text}</p>
+                                    <p className="font-bold text-slate-800 leading-tight truncate group-hover:text-indigo-600 transition-colors ">{task.text}</p>
                                     <div className="flex items-center gap-2 mt-1">
                                         <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400">
                                             Score: {score.toFixed(0)}
@@ -39,29 +42,35 @@ export default function PriorityPanel({ tasks, onToggleSubtask }) {
 
                                     {hasSubtasks && (
                                         <div className="mt-3 space-y-1.5 border-l-2 border-slate-50 pl-3">
-                                            {task.subtasks.map(sub => (
+                                            {task.subtasks.slice(0, 3).map(sub => (
                                                 <div
                                                     key={sub.id}
                                                     className="flex items-center gap-2 group/sub cursor-pointer"
-                                                    onClick={() => onToggleSubtask(task.id, sub.id)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onToggleSubtask(task.id, sub.id);
+                                                    }}
                                                 >
                                                     <div className={`
-                            w-3.5 h-3.5 rounded border flex items-center justify-center transition-all
+                            w-3 h-3 rounded border flex items-center justify-center transition-all
                             ${sub.completed
-                                                            ? 'bg-emerald-500 border-emerald-500 shadow-sm shadow-emerald-100'
+                                                            ? 'bg-emerald-500 border-emerald-500 shadow-sm'
                                                             : 'bg-white border-slate-200 group-hover/sub:border-indigo-300'}
                           `}>
                                                         {sub.completed && (
-                                                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                                            <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                             </svg>
                                                         )}
                                                     </div>
-                                                    <span className={`text-[11px] font-medium transition-all ${sub.completed ? 'text-slate-400 line-through' : 'text-slate-600'}`}>
+                                                    <span className={`text-[10px] font-medium transition-all ${sub.completed ? 'text-slate-400 line-through' : 'text-slate-600'}`}>
                                                         {sub.text}
                                                     </span>
                                                 </div>
                                             ))}
+                                            {task.subtasks.length > 3 && (
+                                                <p className="text-[9px] font-bold text-slate-300 italic">+ {task.subtasks.length - 3} more...</p>
+                                            )}
                                         </div>
                                     )}
                                 </div>

@@ -8,13 +8,15 @@ function getPriorityColor(score) {
     return 'from-slate-300 to-slate-400'
 }
 
-export default function TaskNode({ task, onMove, onDelete, containerRef }) {
+export default function TaskNode({ task, onMove, onDelete, onExpand, containerRef }) {
     const [isDragging, setIsDragging] = useState(false)
     const dragRef = useRef({
         startX: 0,
         startY: 0,
         initialTaskX: 0,
-        initialTaskY: 0
+        initialTaskY: 0,
+        startTime: 0,
+        totalDist: 0
     })
 
     // Use a ref for onMove to avoid stale closures in listeners
@@ -33,9 +35,12 @@ export default function TaskNode({ task, onMove, onDelete, containerRef }) {
             const deltaX = e.clientX - dragRef.current.startX
             const deltaY = e.clientY - dragRef.current.startY
 
+            // Track movement distance for click vs drag threshold
+            dragRef.current.totalDist = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+
             // Calculate new percentage based on mouse movement
             const newX = dragRef.current.initialTaskX + (deltaX / rect.width) * 100
-            const newY = dragRef.current.initialTaskY - (deltaY / rect.height) * 100 // Invert Y
+            const newY = dragRef.current.initialTaskY - (deltaY / rect.height) * 100
 
             // Clamp to 0-100
             const clampedX = Math.max(0, Math.min(100, newX))
@@ -44,8 +49,16 @@ export default function TaskNode({ task, onMove, onDelete, containerRef }) {
             onMoveRef.current(task.id, clampedX, clampedY)
         }
 
-        const handleMouseUp = () => {
+        const handleMouseUp = (e) => {
             setIsDragging(false)
+
+            const duration = Date.now() - dragRef.current.startTime
+            const distance = dragRef.current.totalDist
+
+            // Threshold: < 200ms and < 5px distance = Click (Expand)
+            if (duration < 250 && distance < 6) {
+                onExpand(task.id)
+            }
         }
 
         window.addEventListener('mousemove', handleMouseMove)
@@ -55,7 +68,7 @@ export default function TaskNode({ task, onMove, onDelete, containerRef }) {
             window.removeEventListener('mousemove', handleMouseMove)
             window.removeEventListener('mouseup', handleMouseUp)
         }
-    }, [isDragging, task.id, containerRef])
+    }, [isDragging, task.id, containerRef, onExpand])
 
     const handleMouseDown = (e) => {
         // Only drag with left click and ignore if clicking delete button
@@ -66,7 +79,9 @@ export default function TaskNode({ task, onMove, onDelete, containerRef }) {
             startX: e.clientX,
             startY: e.clientY,
             initialTaskX: task.x,
-            initialTaskY: task.y
+            initialTaskY: task.y,
+            startTime: Date.now(),
+            totalDist: 0
         }
 
         e.preventDefault()
