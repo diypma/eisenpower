@@ -1,0 +1,3 @@
+# Eisenpower
+
+New project initialized.
