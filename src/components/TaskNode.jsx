@@ -19,6 +19,7 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
         startTime: 0,
         totalDist: 0
     })
+    const nodeRef = useRef(null)
 
     // Use a ref for onMove to avoid stale closures in listeners
     const onMoveRef = useRef(onMove)
@@ -72,21 +73,20 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
 
             // Check if dropped on parent (for sub-tasks)
             if (isSubtaskNode && task.parentId && onReturnSubtask) {
-                // Hide self temporarily so we can click "through" to find parent
-                const selfNode = document.querySelector(`[data-task-id="${task.id}"]`)
-                if (selfNode) selfNode.style.display = 'none'
-
-                const elements = document.elementsFromPoint(clientX, clientY)
-                const parentNode = elements.find(el => {
-                    const id = el.getAttribute('data-task-id')
-                    // Ensure we found a task node that IS the parent
-                    return id && parseInt(id) === task.parentId
-                })
-
-                if (selfNode) selfNode.style.display = ''
+                const parentNode = document.querySelector(`.task-node[data-task-id="${task.parentId}"]`)
 
                 if (parentNode) {
-                    onReturnSubtask(task.parentId, task.id)
+                    const rect = parentNode.getBoundingClientRect()
+                    const isOverParent = (
+                        clientX >= rect.left &&
+                        clientX <= rect.right &&
+                        clientY >= rect.top &&
+                        clientY <= rect.bottom
+                    )
+
+                    if (isOverParent) {
+                        onReturnSubtask(task.parentId, task.id)
+                    }
                 }
             }
         }
@@ -160,6 +160,7 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
 
     return (
         <div
+            ref={nodeRef}
             className={`absolute task-node pointer-events-auto cursor-grab active:cursor-grabbing select-none ${isDragging
                 ? 'z-50 scale-110 shadow-2xl'
                 : 'z-10 hover:scale-105 transition-all duration-200'
