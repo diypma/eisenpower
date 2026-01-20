@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
     const [isOpen, setIsOpen] = useState(false)
     const menuRef = useRef(null)
+    const fileInputRef = useRef(null)
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -13,6 +14,46 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
         document.addEventListener("mousedown", handleClickOutside)
         return () => document.removeEventListener("mousedown", handleClickOutside)
     }, [])
+
+    const handleBackup = () => {
+        const data = JSON.stringify(tasks, null, 2)
+        const blob = new Blob([data], { type: "application/json" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `eisenpower_backup_${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        setIsOpen(false)
+    }
+
+    const handleRestore = (e) => {
+        const file = e.target.files[0]
+        if (!file) return
+
+        const reader = new FileReader()
+        reader.onload = (event) => {
+            try {
+                const data = JSON.parse(event.target.result)
+                if (Array.isArray(data)) {
+                    if (window.confirm("This will overwrite your current tasks. Are you sure?")) {
+                        setTasks(data)
+                        alert("Tasks restored successfully!")
+                    }
+                } else {
+                    alert("Invalid backup file format.")
+                }
+            } catch (err) {
+                console.error(err)
+                alert("Error reading backup file.")
+            }
+        }
+        reader.readAsText(file)
+        e.target.value = null // Reset input
+        setIsOpen(false)
+    }
 
     const handleExport = () => {
         let content = "EISENPOWER TASKS EXPORT\n"
@@ -82,6 +123,13 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
 
     return (
         <div className="relative" ref={menuRef}>
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept=".json"
+                onChange={handleRestore}
+            />
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
@@ -96,6 +144,34 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-100">
                     <div className="p-1">
+                        <button
+                            onClick={handleBackup}
+                            className="w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 transition-colors group"
+                        >
+                            <svg className="w-5 h-5 text-slate-400 group-hover:text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Backup Tasks</span>
+                                <span className="text-[10px] text-slate-400">Save to JSON</span>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => fileInputRef.current.click()}
+                            className="w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 transition-colors group"
+                        >
+                            <svg className="w-5 h-5 text-slate-400 group-hover:text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Restore Tasks</span>
+                                <span className="text-[10px] text-slate-400">Load from JSON</span>
+                            </div>
+                        </button>
+
+                        <div className="h-px bg-slate-100 dark:bg-slate-700 mx-2 my-1" />
+
                         <button
                             onClick={handleExport}
                             className="w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 transition-colors group"

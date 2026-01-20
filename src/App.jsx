@@ -51,6 +51,7 @@ function App() {
   const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
   const [expandedTaskId, setExpandedTaskId] = useState(null)
   const [hoveredTaskFamily, setHoveredTaskFamily] = useState(null) // Track parent ID for highlighting
+  const [activeTab, setActiveTab] = useState('matrix') // 'matrix' | 'list'
   const graphContainerRef = useRef(null)
 
   const handleOpenModal = (x, y) => {
@@ -161,15 +162,16 @@ function App() {
         <div className="flex items-center gap-4">
           <SettingsMenu
             tasks={tasks}
+            setTasks={setTasks}
             isDark={theme === 'dark'}
             onToggleTheme={toggleTheme}
           />
         </div>
       </header>
 
-      <main className="flex-1 flex gap-8 p-8 bg-slate-50/50 dark:bg-slate-950 transition-colors">
+      <main className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 p-4 md:p-8 bg-slate-50/50 dark:bg-slate-950 transition-colors pb-24 md:pb-8 overflow-hidden">
         {/* Graph Paper Matrix */}
-        <div className="flex-1 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm relative pr-20 p-8 z-0 transition-colors">
+        <div className={`flex-1 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm relative pr-20 p-8 z-0 transition-colors ${activeTab === 'matrix' ? 'block' : 'hidden md:block'}`}>
           <div className="absolute inset-8" ref={graphContainerRef}>
             <GraphPaper
               onAddTask={handleOpenModal}
@@ -243,7 +245,8 @@ function App() {
         </div>
 
         {/* Priority Panel */}
-        <div className="w-[320px] flex-shrink-0 flex flex-col h-full">
+        {/* Priority Panel */}
+        <div className={`w-full md:w-[320px] flex-shrink-0 flex flex-col h-full overflow-hidden ${activeTab === 'list' ? 'flex' : 'hidden md:flex'}`}>
           <PriorityPanel
             tasks={tasks}
             onToggleSubtask={toggleSubtask}
@@ -252,6 +255,28 @@ function App() {
           />
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-around p-2 pb-safe z-50">
+        <button
+          onClick={() => setActiveTab('matrix')}
+          className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${activeTab === 'matrix' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500'}`}
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+          <span className="text-[10px] font-bold">Matrix</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('list')}
+          className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${activeTab === 'list' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500'}`}
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+          </svg>
+          <span className="text-[10px] font-bold">List</span>
+        </button>
+      </div>
 
       <TaskModal
         isOpen={modalState.isOpen}
