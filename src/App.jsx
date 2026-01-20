@@ -233,6 +233,20 @@ function App() {
         onClose={() => setExpandedTaskId(null)}
         onToggleSubtask={toggleSubtask}
         onDelete={deleteTask}
+        onAddSubtask={(taskId, text) => {
+          setTasks(prev => prev.map(task => {
+            if (task.id === taskId) {
+              return {
+                ...task,
+                subtasks: [...(task.subtasks || []), { id: Date.now(), text, completed: false }]
+              }
+            }
+            return task
+          }))
+        }}
+        onSubtaskDragStart={(taskId, subtask) => {
+          // Optional: Tracking logic if needed
+        }}
       />
     </div>
   )
