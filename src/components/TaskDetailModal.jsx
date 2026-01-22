@@ -33,6 +33,10 @@ export default function TaskDetailModal({
 
     const [isAdding, setIsAdding] = useState(false)
     const [newSubtaskText, setNewSubtaskText] = useState('')
+    const [editingTaskTitle, setEditingTaskTitle] = useState(false)
+    const [editedTaskTitle, setEditedTaskTitle] = useState('')
+    const [editingSubtaskId, setEditingSubtaskId] = useState(null)
+    const [editedSubtaskText, setEditedSubtaskText] = useState('')
 
     // ==========================================================================
     // EVENT HANDLERS
@@ -108,6 +112,34 @@ export default function TaskDetailModal({
         }
     }
 
+    /** Start editing task title */
+    const startEditingTitle = () => {
+        setEditedTaskTitle(task.text)
+        setEditingTaskTitle(true)
+    }
+
+    /** Save edited task title */
+    const saveTaskTitle = () => {
+        if (editedTaskTitle.trim() && editedTaskTitle !== task.text) {
+            onEditTask(task.id, editedTaskTitle.trim())
+        }
+        setEditingTaskTitle(false)
+    }
+
+    /** Start editing subtask */
+    const startEditingSubtask = (subtask) => {
+        setEditingSubtaskId(subtask.id)
+        setEditedSubtaskText(subtask.text)
+    }
+
+    /** Save edited subtask */
+    const saveSubtask = () => {
+        if (editedSubtaskText.trim()) {
+            onEditSubtask(task.id, editingSubtaskId, editedSubtaskText.trim())
+        }
+        setEditingSubtaskId(null)
+    }
+
     // ==========================================================================
     // RENDER
     // ==========================================================================
@@ -124,9 +156,46 @@ export default function TaskDetailModal({
                 {/* Header Section */}
                 <div className="flex justify-between items-start mb-6">
                     <div className="flex-1">
-                        <h2 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white leading-tight pr-4">
-                            {task.text}
-                        </h2>
+                        {editingTaskTitle ? (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    value={editedTaskTitle}
+                                    onChange={(e) => setEditedTaskTitle(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') saveTaskTitle()
+                                        if (e.key === 'Escape') setEditingTaskTitle(false)
+                                    }}
+                                    className="flex-1 text-2xl md:text-3xl font-black text-slate-800 dark:text-white bg-transparent border-b-2 border-indigo-500 outline-none px-1"
+                                />
+                                <button onClick={saveTaskTitle} className="p-2 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-lg transition-colors" title="Save">
+                                    <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </button>
+                                <button onClick={() => setEditingTaskTitle(false)} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Cancel">
+                                    <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="group/title flex items-center gap-2">
+                                <h2 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white leading-tight">
+                                    {task.text}
+                                </h2>
+                                <button
+                                    onClick={startEditingTitle}
+                                    className="opacity-0 group-hover/title:opacity-100 p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-all"
+                                    title="Edit task"
+                                >
+                                    <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                </button>
+                            </div>
+                        )}
                         <div className="flex items-center gap-3 mt-3">
                             <span className="px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 text-[10px] font-black uppercase tracking-widest">
                                 Priority: {priority.toFixed(0)}
@@ -172,38 +241,79 @@ export default function TaskDetailModal({
                         {task.subtasks?.map((sub) => (
                             <div
                                 key={sub.id}
-                                draggable
-                                onDragStart={(e) => {
-                                    e.stopPropagation();
-                                    // Set drag data for subtask extraction
-                                    e.dataTransfer.setData('application/json', JSON.stringify({
-                                        type: 'SUBTASK_EXTRACT',
-                                        taskId: task.id,
-                                        subtaskId: sub.id,
-                                        text: sub.text
-                                    }));
-                                    e.dataTransfer.effectAllowed = 'move';
-                                    onSubtaskDragStart?.(task.id, sub);
-                                }}
-                                className="flex items-center gap-3 group/sub cursor-grab active:cursor-grabbing p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl transition-all"
-                                onClick={() => onToggleSubtask(task.id, sub.id)}
+                                className="group/subtask"
                             >
-                                {/* Checkbox */}
-                                <div className={`
+                                {editingSubtaskId === sub.id ? (
+                                    <div className="flex items-center gap-2 p-2">
+                                        <input
+                                            autoFocus
+                                            type="text"
+                                            value={editedSubtaskText}
+                                            onChange={(e) => setEditedSubtaskText(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') saveSubtask()
+                                                if (e.key === 'Escape') setEditingSubtaskId(null)
+                                            }}
+                                            className="flex-1 bg-white dark:bg-slate-800 border-b-2 border-indigo-500 outline-none text-sm font-semibold text-slate-800 dark:text-slate-200 px-1"
+                                        />
+                                        <button onClick={saveSubtask} className="p-1.5 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-lg transition-colors" title="Save">
+                                            <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </button>
+                                        <button onClick={() => setEditingSubtaskId(null)} className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Cancel">
+                                            <svg className="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div
+                                        draggable
+                                        onDragStart={(e) => {
+                                            e.stopPropagation();
+                                            e.dataTransfer.setData('application/json', JSON.stringify({
+                                                type: 'SUBTASK_EXTRACT',
+                                                taskId: task.id,
+                                                subtaskId: sub.id,
+                                                text: sub.text
+                                            }));
+                                            e.dataTransfer.effectAllowed = 'move';
+                                            onSubtaskDragStart?.(task.id, sub);
+                                        }}
+                                        className="flex items-center gap-3 cursor-grab active:cursor-grabbing p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl transition-all"
+                                        onClick={() => onToggleSubtask(task.id, sub.id)}
+                                    >
+                                        {/* Checkbox */}
+                                        <div className={`
                                     w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all
                                     ${sub.completed
-                                        ? 'bg-emerald-500 border-emerald-500 shadow-sm'
-                                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 group-hover/sub:border-indigo-300 dark:group-hover/sub:border-indigo-500'}
+                                                ? 'bg-emerald-500 border-emerald-500 shadow-sm'
+                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 group-hover/sub:border-indigo-300 dark:group-hover/sub:border-indigo-500'}
                                 `}>
-                                    {sub.completed && (
-                                        <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    )}
-                                </div>
-                                <span className={`font-semibold text-sm transition-all ${sub.completed ? 'text-slate-400 dark:text-slate-600 line-through' : 'text-slate-700 dark:text-slate-300'}`}>
-                                    {sub.text}
-                                </span>
+                                            {sub.completed && (
+                                                <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <span className={`flex-1 font-semibold text-sm transition-all ${sub.completed ? 'text-slate-400 dark:text-slate-600 line-through' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            {sub.text}
+                                        </span>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                startEditingSubtask(sub)
+                                            }}
+                                            className="opacity-0 group-hover/subtask:opacity-100 p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-all"
+                                            title="Edit subtask"
+                                        >
+                                            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         ))}
 
