@@ -253,7 +253,7 @@ function App() {
       <main className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 p-4 md:p-8 bg-slate-50/50 dark:bg-slate-950 transition-colors pb-24 md:pb-8 overflow-hidden">
 
         {/* Eisenhower Matrix Grid */}
-        <div className={`flex-1 bg-white dark:bg-slate-900 rounded-2xl md:rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm relative p-0 md:p-2 z-0 transition-colors overflow-hidden ${activeTab === 'matrix' ? 'block' : 'hidden md:block'}`}>
+        <div className={`flex-1 bg-white dark:bg-slate-900 rounded-2xl md:rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm relative p-0 md:p-2 z-0 transition-colors ${activeTab === 'matrix' ? 'block' : 'hidden md:block'}`}>
           <div className="absolute inset-0 md:inset-2" ref={graphContainerRef}>
             <GraphPaper
               onAddTask={handleOpenModal}

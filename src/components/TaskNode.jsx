@@ -230,12 +230,10 @@ export default function TaskNode({
     // RENDER
     // ==========================================================================
 
-    // Remap 0-100 coordinates to visual percentages with edge margins
-    // This ensures tasks at 0% or 100% don't clip outside the container
-    // 10% margin = ~100-200px on typical screens, enough for max task width (200px card / 2 = 100px radius)
-    const EDGE_MARGIN = 10 // % margin on each side
-    const visualX = EDGE_MARGIN + (task.x / 100) * (100 - 2 * EDGE_MARGIN)
-    const visualY = EDGE_MARGIN + (task.y / 100) * (100 - 2 * EDGE_MARGIN)
+    // Use direct coordinates - allow tasks to position at true 0-100%
+    // Overflow handling is managed at container level
+    const visualX = task.x
+    const visualY = task.y
 
     return (
         <div
