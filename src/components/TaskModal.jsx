@@ -81,7 +81,7 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
                                     <input
                                         type="text"
                                         placeholder="Sub-task details..."
-                                        className="flex-1 px-3 py-2 rounded-lg border border-slate-100 dark:border-slate-700 text-sm outline-none focus:border-indigo-300 bg-slate-50 dark:bg-slate-700/50 text-slate-800 dark:text-slate-200"
+                                        className="flex-1 px-3 py-2 rounded-lg border border-slate-100 dark:border-slate-700 text-base outline-none focus:border-indigo-300 bg-slate-50 dark:bg-slate-700/50 text-slate-800 dark:text-slate-200"
                                         value={sub.text}
                                         onChange={(e) => handleSubtaskChange(sub.id, e.target.value)}
                                         autoFocus
