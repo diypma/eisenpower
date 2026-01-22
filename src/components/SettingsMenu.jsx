@@ -263,6 +263,31 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme })
                                 <span className="text-[10px] text-slate-400">Switch theme</span>
                             </div>
                         </button>
+
+                        <div className="h-px bg-slate-100 dark:bg-slate-700 mx-2 my-1" />
+
+                        {/* Clear All Data - Danger Zone */}
+                        <button
+                            onClick={() => {
+                                if (window.confirm("Are you sure you want to delete ALL your tasks? This cannot be undone.")) {
+                                    if (window.confirm("This is your last chance! All tasks will be permanently deleted. Continue?")) {
+                                        setTasks([])
+                                        localStorage.removeItem('eisenpower-tasks')
+                                        alert("All data has been cleared.")
+                                        setIsOpen(false)
+                                    }
+                                }
+                            }}
+                            className="w-full text-left px-4 py-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors group"
+                        >
+                            <svg className="w-5 h-5 text-slate-400 group-hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-red-600 dark:group-hover:text-red-400">Clear All Data</span>
+                                <span className="text-[10px] text-slate-400">Delete all tasks</span>
+                            </div>
+                        </button>
                     </div>
                 </div>
             )}
