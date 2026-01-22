@@ -113,7 +113,7 @@ export default function GraphPaper({ onAddTask, onDrop, zoom = 1, onZoomChange, 
     // ==========================================================================
 
     return (
-        <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+        <div className="relative w-full h-full flex items-center justify-center">
 
             {/* Zoom Controls - Appears when grid is busy */}
             {showZoomControls && (
@@ -208,7 +208,7 @@ export default function GraphPaper({ onAddTask, onDrop, zoom = 1, onZoomChange, 
                 <div className="absolute bottom-3 left-3 md:bottom-6 md:left-6 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-500 text-[9px] md:text-[10px] font-black uppercase tracking-wider pointer-events-none select-none z-0">Eliminate</div>
 
                 {/* Task Nodes (rendered as children) */}
-                <div className="absolute inset-0 z-20 overflow-visible pointer-events-none">
+                <div className="absolute inset-0 z-20 pointer-events-none" style={{ overflow: 'visible' }}>
                     {children}
                 </div>
             </div>
