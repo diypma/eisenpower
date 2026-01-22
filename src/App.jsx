@@ -172,8 +172,8 @@ function App() {
 
       <main className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 p-4 md:p-8 bg-slate-50/50 dark:bg-slate-950 transition-colors pb-24 md:pb-8 overflow-hidden">
         {/* Graph Paper Matrix */}
-        <div className={`flex-1 bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm relative pr-20 p-8 z-0 transition-colors ${activeTab === 'matrix' ? 'block' : 'hidden md:block'}`}>
-          <div className="absolute inset-8" ref={graphContainerRef}>
+        <div className={`flex-1 bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[32px] rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm relative p-2 md:p-8 md:pr-20 z-0 transition-colors ${activeTab === 'matrix' ? 'block' : 'hidden md:block'}`}>
+          <div className="absolute inset-2 md:inset-8" ref={graphContainerRef}>
             <GraphPaper
               onAddTask={handleOpenModal}
               onDrop={handleSubtaskDrop}
