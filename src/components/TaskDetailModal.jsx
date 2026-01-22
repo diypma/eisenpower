@@ -119,12 +119,12 @@ export default function TaskDetailModal({
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
         >
-            <div className="bg-white dark:bg-slate-800 rounded-[32px] shadow-2xl w-full max-w-lg p-10 animate-in zoom-in-95 duration-200 border border-transparent dark:border-slate-700">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl md:rounded-[32px] shadow-2xl w-full max-w-lg mx-4 p-6 md:p-10 animate-in zoom-in-95 duration-200 border border-transparent dark:border-slate-700 max-h-[90vh] overflow-y-auto">
 
                 {/* Header Section */}
                 <div className="flex justify-between items-start mb-6">
                     <div className="flex-1">
-                        <h2 className="text-3xl font-black text-slate-800 dark:text-white leading-tight pr-4">
+                        <h2 className="text-2xl md:text-3xl font-black text-slate-800 dark:text-white leading-tight pr-4">
                             {task.text}
                         </h2>
                         <div className="flex items-center gap-3 mt-3">
@@ -246,7 +246,7 @@ export default function TaskDetailModal({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-4 border-t border-slate-100 dark:border-slate-700 pt-8">
+                <div className="flex flex-wrap gap-2 md:gap-4 border-t border-slate-100 dark:border-slate-700 pt-6 md:pt-8">
                     <button
                         onClick={() => {
                             if (window.confirm("Delete this task?")) {
@@ -254,7 +254,7 @@ export default function TaskDetailModal({
                                 onClose();
                             }
                         }}
-                        className="px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        className="px-4 md:px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                         Delete Task
                     </button>
@@ -264,14 +264,14 @@ export default function TaskDetailModal({
                                 onComplete(task.id);
                             }
                         }}
-                        className="px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                        className="px-4 md:px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
                     >
                         ✓ Mark Complete
                     </button>
                     <div className="flex-1" />
                     <button
                         onClick={onClose}
-                        className="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-slate-200 transition-all shadow-lg active:scale-95"
+                        className="px-6 md:px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-slate-200 transition-all shadow-lg active:scale-95 ml-auto"
                     >
                         Close
                     </button>

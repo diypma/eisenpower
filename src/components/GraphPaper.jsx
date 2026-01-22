@@ -183,10 +183,10 @@ export default function GraphPaper({ onAddTask, onDrop, zoom = 1, onZoomChange, 
                 </div>
 
                 {/* Quadrant Labels (Eisenhower Matrix Categories) */}
-                <div className="absolute top-6 right-6 text-[10px] font-black text-slate-300/40 dark:text-slate-600/40 uppercase tracking-[0.2em] pointer-events-none select-none z-0">Do First</div>
-                <div className="absolute top-6 left-6 text-[10px] font-black text-slate-300/40 dark:text-slate-600/40 uppercase tracking-[0.2em] pointer-events-none select-none z-0">Schedule</div>
-                <div className="absolute bottom-6 right-6 text-[10px] font-black text-slate-300/40 dark:text-slate-600/40 uppercase tracking-[0.2em] pointer-events-none select-none z-0">Delegate</div>
-                <div className="absolute bottom-6 left-6 text-[10px] font-black text-slate-300/40 dark:text-slate-600/40 uppercase tracking-[0.2em] pointer-events-none select-none z-0">Eliminate</div>
+                <div className="absolute top-3 right-3 md:top-6 md:right-6 px-2 py-1 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-[9px] md:text-[10px] font-black uppercase tracking-wider pointer-events-none select-none z-0">Do First</div>
+                <div className="absolute top-3 left-3 md:top-6 md:left-6 px-2 py-1 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px] md:text-[10px] font-black uppercase tracking-wider pointer-events-none select-none z-0">Schedule</div>
+                <div className="absolute bottom-3 right-3 md:bottom-6 md:right-6 px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[9px] md:text-[10px] font-black uppercase tracking-wider pointer-events-none select-none z-0">Delegate</div>
+                <div className="absolute bottom-3 left-3 md:bottom-6 md:left-6 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-500 text-[9px] md:text-[10px] font-black uppercase tracking-wider pointer-events-none select-none z-0">Eliminate</div>
 
                 {/* Task Nodes (rendered as children) */}
                 <div className="absolute inset-0 z-20 overflow-visible pointer-events-none">
