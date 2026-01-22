@@ -129,6 +129,9 @@ export default function TaskNode({
 
             setIsDragging(false)
 
+            // Set global timestamp when drag ends - used by GraphPaper to ignore false clicks
+            window.__eisenpowerLastDragEnd = Date.now()
+
             const duration = Date.now() - dragRef.current.startTime
             const distance = dragRef.current.totalDist
 
