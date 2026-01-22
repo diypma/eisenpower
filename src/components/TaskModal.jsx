@@ -1,10 +1,34 @@
+/**
+ * TaskModal.jsx - New Task Creation Modal
+ * 
+ * A form modal for creating new tasks with optional subtasks.
+ * Opens when clicking on the Eisenhower Matrix grid.
+ * 
+ * Features:
+ * - Task description input
+ * - Dynamic subtask list (add/remove)
+ * - Backdrop click to close
+ * - Auto-focus for quick entry
+ */
+
 import { useRef, useState, useEffect } from 'react'
 
 export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
+    // ==========================================================================
+    // STATE
+    // ==========================================================================
+
     const [text, setText] = useState('')
     const [subtasks, setSubtasks] = useState([])
     const inputRef = useRef(null)
 
+    // ==========================================================================
+    // EFFECTS
+    // ==========================================================================
+
+    /**
+     * Reset form and focus input when modal opens
+     */
     useEffect(() => {
         if (isOpen) {
             setText('')
@@ -13,20 +37,33 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
         }
     }, [isOpen])
 
+    // Don't render if not open
     if (!isOpen) return null
 
+    // ==========================================================================
+    // SUBTASK HANDLERS
+    // ==========================================================================
+
+    /** Add a new empty subtask */
     const handleAddSubtask = () => {
         setSubtasks([...subtasks, { id: Date.now(), text: '', completed: false }])
     }
 
+    /** Update subtask text */
     const handleSubtaskChange = (id, val) => {
         setSubtasks(subtasks.map(s => s.id === id ? { ...s, text: val } : s))
     }
 
+    /** Remove a subtask */
     const handleRemoveSubtask = (id) => {
         setSubtasks(subtasks.filter(s => s.id !== id))
     }
 
+    // ==========================================================================
+    // FORM SUBMISSION
+    // ==========================================================================
+
+    /** Submit the new task */
     const handleSubmit = (e) => {
         e.preventDefault()
         if (!text.trim()) return
@@ -37,9 +74,14 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
         })
     }
 
+    /** Close modal when clicking backdrop */
     const handleBackdropClick = (e) => {
         if (e.target === e.currentTarget) onClose()
     }
+
+    // ==========================================================================
+    // RENDER
+    // ==========================================================================
 
     return (
         <div
@@ -50,8 +92,11 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
                 <h2 className="text-2xl font-black mb-6 text-slate-800 dark:text-white">Add New Task</h2>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Task Description Input */}
                     <div>
-                        <label className="block text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">Task Description</label>
+                        <label className="block text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
+                            Task Description
+                        </label>
                         <input
                             ref={inputRef}
                             type="text"
@@ -63,9 +108,12 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
                         />
                     </div>
 
+                    {/* Subtasks Section */}
                     <div>
                         <div className="flex justify-between items-center mb-2">
-                            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Sub-tasks</label>
+                            <label className="block text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                                Sub-tasks
+                            </label>
                             <button
                                 type="button"
                                 onClick={handleAddSubtask}
@@ -75,6 +123,7 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
                             </button>
                         </div>
 
+                        {/* Subtask List */}
                         <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                             {subtasks.map((sub) => (
                                 <div key={sub.id} className="flex gap-2">
@@ -96,11 +145,14 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
                                 </div>
                             ))}
                             {subtasks.length === 0 && (
-                                <p className="text-xs text-slate-300 dark:text-slate-600 italic py-2">No sub-tasks added yet.</p>
+                                <p className="text-xs text-slate-300 dark:text-slate-600 italic py-2">
+                                    No sub-tasks added yet.
+                                </p>
                             )}
                         </div>
                     </div>
 
+                    {/* Action Buttons */}
                     <div className="flex gap-3 pt-2">
                         <button
                             type="button"

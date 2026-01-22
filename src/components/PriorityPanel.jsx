@@ -1,13 +1,35 @@
+/**
+ * PriorityPanel.jsx - Sorted Task List Component
+ * 
+ * Displays all tasks in a scrollable list, sorted by priority score.
+ * Priority = (Importance × 0.6) + (Urgency × 0.4)
+ * 
+ * Features:
+ * - Ranked task list with priority scores
+ * - Inline subtask toggles
+ * - Positioned subtasks shown with parent reference
+ * - Collapsible completed tasks archive
+ * - Relative completion timestamps
+ */
+
 import { useState } from 'react'
 
 export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, onCompleteTask }) {
+    // ==========================================================================
+    // STATE
+    // ==========================================================================
+
     const [showArchive, setShowArchive] = useState(false)
+
+    // ==========================================================================
+    // DATA PROCESSING
+    // ==========================================================================
 
     // Separate active and completed tasks
     const activeTasks = tasks.filter(t => !t.completed)
     const completedTasks = tasks.filter(t => t.completed)
 
-    // Create unified list: main tasks + positioned sub-tasks (active only)
+    // Create unified list: main tasks + positioned sub-tasks (on the grid)
     const allItems = [
         ...activeTasks.map(t => ({ ...t, type: 'task' })),
         ...activeTasks.flatMap(t =>
@@ -17,20 +39,28 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
         )
     ]
 
-    // Sort by score
+    // Sort by priority score (highest first)
     const sortedItems = allItems.sort((a, b) => {
         const scoreA = (a.y * 0.6) + (a.x * 0.4)
         const scoreB = (b.y * 0.6) + (b.x * 0.4)
         return scoreB - scoreA
     })
 
-    // Get IDs of positioned sub-tasks to exclude from nested display
+    // Track positioned subtask IDs to exclude from nested display
     const positionedSubtaskIds = new Set(
         activeTasks.flatMap(t => (t.subtasks || []).filter(s => s.x !== undefined && s.x !== null).map(s => s.id))
     )
 
+    // Display index counter for numbered list
     let displayIndex = 0
 
+    // ==========================================================================
+    // HELPER FUNCTIONS
+    // ==========================================================================
+
+    /**
+     * Format ISO date string as relative time (e.g., "2 days ago")
+     */
     const formatRelativeTime = (isoString) => {
         const date = new Date(isoString)
         const now = new Date()
@@ -44,8 +74,14 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
         return `${Math.floor(diffDays / 30)} months ago`
     }
 
+    // ==========================================================================
+    // RENDER
+    // ==========================================================================
+
     return (
         <div className="bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-xl shadow-slate-200/50 dark:shadow-black/20 border border-slate-100 dark:border-slate-700 h-full flex flex-col overflow-hidden transition-colors">
+
+            {/* Panel Header */}
             <h2 className="text-2xl font-black mb-6 flex items-center gap-2 flex-shrink-0 text-slate-900 dark:text-white">
                 Priority Order
                 <span className="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 text-xs px-2 py-1 rounded-full">
@@ -53,12 +89,13 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
                 </span>
             </h2>
 
+            {/* Scrollable Task List */}
             <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar">
                 {sortedItems.map((item) => {
                     const score = (item.y * 0.6) + (item.x * 0.4)
 
+                    // Render positioned subtask (extracted to grid)
                     if (item.type === 'positioned-subtask') {
-                        // Render positioned sub-task with indent
                         return (
                             <div key={`sub-${item.id}`} className="group pl-8">
                                 <div
@@ -96,11 +133,16 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
                                 className="flex items-start gap-4 cursor-pointer"
                                 onClick={() => onExpandTask(task.id)}
                             >
+                                {/* Rank Number */}
                                 <span className="font-black text-slate-200 dark:text-slate-700 text-2xl tabular-nums leading-none pt-1 group-hover:text-indigo-100 dark:group-hover:text-indigo-900 transition-colors">
                                     {String(displayIndex).padStart(2, '0')}
                                 </span>
+
                                 <div className="flex-1 min-w-0">
+                                    {/* Task Title */}
                                     <p className="font-bold text-slate-800 dark:text-slate-200 leading-tight truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{task.text}</p>
+
+                                    {/* Task Metadata */}
                                     <div className="flex items-center gap-2 mt-1">
                                         <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400 dark:text-slate-500">
                                             Score: {score.toFixed(0)}
@@ -111,6 +153,7 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
                                         </p>
                                     </div>
 
+                                    {/* Inline Subtasks (non-positioned only) */}
                                     {nonPositionedSubtasks.length > 0 && (
                                         <div className="mt-3 space-y-1.5 border-l-2 border-slate-50 dark:border-slate-700 pl-3">
                                             {nonPositionedSubtasks.slice(0, 3).map(sub => (
@@ -122,6 +165,7 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
                                                         onToggleSubtask(task.id, sub.id);
                                                     }}
                                                 >
+                                                    {/* Checkbox */}
                                                     <div className={`
                                                         w-3 h-3 rounded border flex items-center justify-center transition-all
                                                         ${sub.completed
@@ -149,6 +193,8 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
                         </div>
                     )
                 })}
+
+                {/* Empty State */}
                 {sortedItems.length === 0 && (
                     <div className="text-center py-20 text-slate-400 dark:text-slate-600">
                         <div className="bg-slate-50 dark:bg-slate-800 w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-100/50 dark:border-slate-700/50">
@@ -161,9 +207,10 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
                     </div>
                 )}
 
-                {/* Archive Section */}
+                {/* Completed Tasks Archive */}
                 {completedTasks.length > 0 && (
                     <div className="mt-8 pt-6 border-t-2 border-slate-100 dark:border-slate-700">
+                        {/* Archive Toggle Button */}
                         <button
                             onClick={() => setShowArchive(!showArchive)}
                             className="flex items-center gap-2 w-full text-left group mb-4"
@@ -181,6 +228,7 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
                             </h3>
                         </button>
 
+                        {/* Archived Task List */}
                         {showArchive && (
                             <div className="space-y-3">
                                 {completedTasks.map(task => (

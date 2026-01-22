@@ -1,10 +1,33 @@
+/**
+ * SettingsMenu.jsx - Application Settings Dropdown
+ * 
+ * Provides access to app settings and data management features.
+ * 
+ * Features:
+ * - Backup tasks to JSON file (for iCloud/cross-device sync)
+ * - Restore tasks from JSON backup
+ * - Export tasks as human-readable text
+ * - Toggle dark/light theme
+ */
+
 import { useState, useEffect, useRef } from 'react'
 
-export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
+export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme }) {
+    // ==========================================================================
+    // STATE & REFS
+    // ==========================================================================
+
     const [isOpen, setIsOpen] = useState(false)
     const menuRef = useRef(null)
     const fileInputRef = useRef(null)
 
+    // ==========================================================================
+    // CLICK OUTSIDE HANDLER
+    // ==========================================================================
+
+    /**
+     * Close menu when clicking outside
+     */
     useEffect(() => {
         function handleClickOutside(event) {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -15,6 +38,14 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
         return () => document.removeEventListener("mousedown", handleClickOutside)
     }, [])
 
+    // ==========================================================================
+    // BACKUP & RESTORE HANDLERS
+    // ==========================================================================
+
+    /**
+     * Export tasks as JSON file for backup
+     * Can be saved to iCloud Drive for cross-device sync
+     */
     const handleBackup = () => {
         const data = JSON.stringify(tasks, null, 2)
         const blob = new Blob([data], { type: "application/json" })
@@ -29,6 +60,10 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
         setIsOpen(false)
     }
 
+    /**
+     * Import tasks from JSON backup file
+     * Validates file format before overwriting
+     */
     const handleRestore = (e) => {
         const file = e.target.files[0]
         if (!file) return
@@ -51,10 +86,18 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
             }
         }
         reader.readAsText(file)
-        e.target.value = null // Reset input
+        e.target.value = null // Reset input for re-upload
         setIsOpen(false)
     }
 
+    // ==========================================================================
+    // TEXT EXPORT HANDLER
+    // ==========================================================================
+
+    /**
+     * Export tasks as human-readable text file
+     * Useful for sharing or printing task lists
+     */
     const handleExport = () => {
         let content = "EISENPOWER TASKS EXPORT\n"
         content += `Date: ${new Date().toLocaleString()}\n`
@@ -64,7 +107,7 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
         const activeTasks = tasks.filter(t => !t.completed)
         const completedTasks = tasks.filter(t => t.completed)
 
-        // Sort by priority logic (same as panel)
+        // Sort by priority score (same algorithm as PriorityPanel)
         const sortedActive = [...activeTasks].sort((a, b) => {
             const scoreA = (a.y * 0.6) + (a.x * 0.4)
             const scoreB = (b.y * 0.6) + (b.x * 0.4)
@@ -121,8 +164,13 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
         setIsOpen(false)
     }
 
+    // ==========================================================================
+    // RENDER
+    // ==========================================================================
+
     return (
         <div className="relative" ref={menuRef}>
+            {/* Hidden file input for restore */}
             <input
                 type="file"
                 ref={fileInputRef}
@@ -130,6 +178,8 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
                 accept=".json"
                 onChange={handleRestore}
             />
+
+            {/* Settings Toggle Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
@@ -141,9 +191,11 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
                 </svg>
             </button>
 
+            {/* Dropdown Menu */}
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-100">
                     <div className="p-1">
+                        {/* Backup Button */}
                         <button
                             onClick={handleBackup}
                             className="w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 transition-colors group"
@@ -157,6 +209,7 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
                             </div>
                         </button>
 
+                        {/* Restore Button */}
                         <button
                             onClick={() => fileInputRef.current.click()}
                             className="w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 transition-colors group"
@@ -172,6 +225,7 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
 
                         <div className="h-px bg-slate-100 dark:bg-slate-700 mx-2 my-1" />
 
+                        {/* Export Button */}
                         <button
                             onClick={handleExport}
                             className="w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 transition-colors group"
@@ -185,6 +239,7 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
                             </div>
                         </button>
 
+                        {/* Theme Toggle */}
                         <button
                             onClick={() => {
                                 onToggleTheme()
@@ -201,7 +256,6 @@ export default function SettingsMenu({ tasks, isDark, onToggleTheme }) {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                                 </svg>
                             )}
-
                             <div className="flex flex-col">
                                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
                                     {isDark ? 'Light Mode' : 'Dark Mode'}

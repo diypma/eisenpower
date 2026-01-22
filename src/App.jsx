@@ -1,3 +1,19 @@
+/**
+ * App.jsx - Eisenpower Main Application
+ * 
+ * This is the root component of the Eisenpower task management application.
+ * It implements an Eisenhower Matrix (Urgency vs Importance grid) for task prioritization.
+ * 
+ * Key Features:
+ * - Task creation, editing, and deletion
+ * - Drag-and-drop task positioning on the matrix
+ * - Sub-task management with grid extraction
+ * - Dark/Light theme support
+ * - Mobile-responsive tabbed interface
+ * - LocalStorage persistence
+ * - Zoom controls for dense task layouts
+ */
+
 import { useState, useRef, useEffect } from 'react'
 import GraphPaper from './components/GraphPaper'
 import TaskNode from './components/TaskNode'
@@ -8,10 +24,19 @@ import SettingsMenu from './components/SettingsMenu'
 import { getTaskAccentColor } from './utils/colorUtils'
 
 function App() {
+  // ==========================================================================
+  // STATE MANAGEMENT
+  // ==========================================================================
+
+  /**
+   * Tasks array - persisted to localStorage
+   * Each task has: id, text, x (urgency 0-100), y (importance 0-100), subtasks[], completed?, completedAt?
+   */
   const [tasks, setTasks] = useState(() => {
     try {
       const saved = localStorage.getItem('eisenpower-tasks')
       return saved ? JSON.parse(saved) : [
+        // Default demo tasks
         {
           id: 1,
           text: 'Launch Eisenpower',
@@ -31,14 +56,31 @@ function App() {
     }
   })
 
+  /**
+   * Theme state - 'light' or 'dark', persisted to localStorage
+   */
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('eisenpower-theme') || 'light'
   })
 
+  // Modal and UI state
+  const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
+  const [expandedTaskId, setExpandedTaskId] = useState(null)
+  const [hoveredTaskFamily, setHoveredTaskFamily] = useState(null)
+  const [activeTab, setActiveTab] = useState('matrix') // Mobile tab: 'matrix' | 'list'
+  const [zoom, setZoom] = useState(1) // Grid zoom level (0.2 - 2.0)
+  const graphContainerRef = useRef(null)
+
+  // ==========================================================================
+  // PERSISTENCE EFFECTS
+  // ==========================================================================
+
+  /** Persist tasks to localStorage whenever they change */
   useEffect(() => {
     localStorage.setItem('eisenpower-tasks', JSON.stringify(tasks))
   }, [tasks])
 
+  /** Persist theme and apply to document */
   useEffect(() => {
     localStorage.setItem('eisenpower-theme', theme)
     if (theme === 'dark') {
@@ -48,17 +90,16 @@ function App() {
     }
   }, [theme])
 
-  const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
-  const [expandedTaskId, setExpandedTaskId] = useState(null)
-  const [hoveredTaskFamily, setHoveredTaskFamily] = useState(null) // Track parent ID for highlighting
-  const [activeTab, setActiveTab] = useState('matrix') // 'matrix' | 'list'
-  const [zoom, setZoom] = useState(1)
-  const graphContainerRef = useRef(null)
+  // ==========================================================================
+  // TASK OPERATIONS
+  // ==========================================================================
 
+  /** Open the task creation modal at the specified grid position */
   const handleOpenModal = (x, y) => {
     setModalState({ isOpen: true, x, y })
   }
 
+  /** Create a new task from the modal form data */
   const handleCreateTask = ({ text, subtasks }) => {
     const newTask = {
       id: Date.now(),
@@ -71,17 +112,20 @@ function App() {
     setModalState({ ...modalState, isOpen: false })
   }
 
+  /** Move a task to a new position on the grid */
   const moveTask = (id, x, y) => {
     setTasks(prev => prev.map(task =>
       task.id === id ? { ...task, x, y } : task
     ))
   }
 
+  /** Delete a task by ID */
   const deleteTask = (id) => {
     setTasks(prev => prev.filter(t => t.id !== id))
     if (expandedTaskId === id) setExpandedTaskId(null)
   }
 
+  /** Toggle a subtask's completed state */
   const toggleSubtask = (taskId, subtaskId) => {
     setTasks(prev => prev.map(task => {
       if (task.id === taskId) {
@@ -90,7 +134,7 @@ function App() {
           subtasks: task.subtasks.map(s => {
             if (s.id === subtaskId) {
               const newCompleted = !s.completed
-              // If completing a positioned sub-task, remove it from grid
+              // Remove from grid if completing a positioned sub-task
               if (newCompleted && s.x !== undefined && s.x !== null) {
                 return { ...s, completed: newCompleted, x: undefined, y: undefined }
               }
@@ -104,6 +148,7 @@ function App() {
     }))
   }
 
+  /** Mark a task as complete and record completion time */
   const completeTask = (taskId) => {
     setTasks(prev => prev.map(task => {
       if (task.id === taskId) {
@@ -118,10 +163,16 @@ function App() {
     setExpandedTaskId(null)
   }
 
+  /** Toggle between light and dark theme */
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
   }
 
+  // ==========================================================================
+  // SUBTASK GRID OPERATIONS
+  // ==========================================================================
+
+  /** Handle dropping a subtask onto the grid to extract it */
   const handleSubtaskDrop = (x, y, data) => {
     if (data.type === 'SUBTASK_EXTRACT') {
       setTasks(prev => prev.map(t => {
@@ -139,6 +190,7 @@ function App() {
     }
   }
 
+  /** Return a subtask from the grid back to its parent task */
   const handleReturnSubtask = (parentId, subtaskId) => {
     setTasks(prev => prev.map(t => {
       if (t.id === parentId) {
@@ -153,9 +205,14 @@ function App() {
     }))
   }
 
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+
   return (
     <div className={`h-screen bg-white dark:bg-slate-900 font-sans text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200`}>
-      {/* Ultra Compact Header */}
+
+      {/* Header Bar */}
       <header className="px-8 py-4 flex justify-between items-center bg-white dark:bg-slate-900 z-50 relative shadow-sm dark:shadow-slate-800 border-b border-transparent dark:border-slate-800 transition-colors">
         <h1 className="text-xl font-black tracking-tighter bg-gradient-to-br from-indigo-600 to-violet-700 dark:from-indigo-400 dark:to-violet-400 bg-clip-text text-transparent">
           Eisenpower
@@ -170,8 +227,10 @@ function App() {
         </div>
       </header>
 
+      {/* Main Content Area */}
       <main className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 p-4 md:p-8 bg-slate-50/50 dark:bg-slate-950 transition-colors pb-24 md:pb-8 overflow-hidden">
-        {/* Graph Paper Matrix */}
+
+        {/* Eisenhower Matrix Grid */}
         <div className={`flex-1 bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[32px] rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm relative p-2 md:p-8 md:pr-20 z-0 transition-colors ${activeTab === 'matrix' ? 'block' : 'hidden md:block'}`}>
           <div className="absolute inset-2 md:inset-8" ref={graphContainerRef}>
             <GraphPaper
@@ -180,6 +239,7 @@ function App() {
               zoom={zoom}
               onZoomChange={setZoom}
             >
+              {/* Main Tasks */}
               {tasks.filter(task => !task.completed).map(task => (
                 <TaskNode
                   key={task.id}
@@ -195,7 +255,7 @@ function App() {
                 />
               ))}
 
-              {/* Positioned Sub-tasks */}
+              {/* Positioned Sub-tasks (extracted to grid) */}
               {tasks.filter(task => !task.completed).flatMap(task => {
                 const parentAccentColor = getTaskAccentColor(task.id)
                 return (task.subtasks || [])
@@ -247,8 +307,7 @@ function App() {
           </div>
         </div>
 
-        {/* Priority Panel */}
-        {/* Priority Panel */}
+        {/* Priority Panel (Sorted Task List) */}
         <div className={`w-full md:w-[320px] flex-shrink-0 flex flex-col h-full overflow-hidden ${activeTab === 'list' ? 'flex' : 'hidden md:flex'}`}>
           <PriorityPanel
             tasks={tasks}
@@ -281,6 +340,7 @@ function App() {
         </button>
       </div>
 
+      {/* Task Creation Modal */}
       <TaskModal
         isOpen={modalState.isOpen}
         onClose={() => setModalState({ ...modalState, isOpen: false })}
@@ -288,6 +348,7 @@ function App() {
         position={modalState}
       />
 
+      {/* Task Detail/Edit Modal */}
       <TaskDetailModal
         isOpen={!!expandedTaskId}
         task={tasks.find(t => t.id === expandedTaskId)}
@@ -307,7 +368,7 @@ function App() {
           }))
         }}
         onSubtaskDragStart={(taskId, subtask) => {
-          // Track
+          // Tracking hook for animations (currently unused)
         }}
         onDrop={handleSubtaskDrop}
         gridRef={graphContainerRef}

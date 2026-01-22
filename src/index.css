@@ -1,27 +1,62 @@
+/**
+ * index.css - Global Styles for Eisenpower
+ * 
+ * This file contains:
+ * - Tailwind CSS imports
+ * - Dark mode configuration
+ * - CSS custom properties (variables)
+ * - Base typography and body styles
+ * - Custom utility classes
+ * - Scrollbar styling
+ */
+
+/* ==========================================================================
+   TAILWIND IMPORTS
+   ========================================================================== */
 @import "tailwindcss";
 
-/* Enable class-based dark mode for Tailwind v4 */
+/* ==========================================================================
+   DARK MODE CONFIGURATION
+   Enable class-based dark mode for Tailwind v4
+   ========================================================================== */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ==========================================================================
+   THEME CONFIGURATION
+   Custom font family using Inter for modern, clean typography
+   ========================================================================== */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* ==========================================================================
+   CSS CUSTOM PROPERTIES
+   Variables for themeable elements like the grid dot pattern
+   ========================================================================== */
 :root {
   --grid-dot-color: #e2e8f0;
+  /* Light mode: slate-200 */
 }
 
 .dark {
   --grid-dot-color: #334155;
+  /* Dark mode: slate-700 */
 }
 
+/* ==========================================================================
+   BASE BODY STYLES
+   ========================================================================== */
 body {
   @apply bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200;
   touch-action: pan-x pan-y;
-  /* Allow scrolling but we override on draggable el */
+  /* Allow scrolling, override on draggables */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ==========================================================================
+   UTILITY CLASSES
+   ========================================================================== */
 
 /* Prevent text selection during drag on touch devices */
 .select-none {
@@ -29,7 +64,10 @@ body {
   user-select: none;
 }
 
-/* Custom Scrollbar for better aesthetics */
+/* ==========================================================================
+   CUSTOM SCROLLBAR
+   Styled scrollbar for better aesthetics in panels
+   ========================================================================== */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }

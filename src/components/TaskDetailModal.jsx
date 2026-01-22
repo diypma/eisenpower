@@ -1,13 +1,52 @@
+/**
+ * TaskDetailModal.jsx - Task Detail and Edit Modal
+ * 
+ * Displays full task details with subtask management capabilities.
+ * Supports dragging subtasks out to the grid for independent tracking.
+ * 
+ * Features:
+ * - View/edit task details
+ * - Toggle subtask completion
+ * - Add new subtasks
+ * - Drag subtasks to grid for visual positioning
+ * - Delete or complete tasks
+ * - Escape key to close
+ */
+
 import { useEffect, useState } from 'react'
 
-export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask, onDelete, onComplete, onSubtaskDragStart, onAddSubtask, onDrop, gridRef }) {
+export default function TaskDetailModal({
+    isOpen,
+    onClose,
+    task,
+    onToggleSubtask,
+    onDelete,
+    onComplete,
+    onSubtaskDragStart,
+    onAddSubtask,
+    onDrop,
+    gridRef
+}) {
+    // ==========================================================================
+    // STATE
+    // ==========================================================================
+
     const [isAdding, setIsAdding] = useState(false)
     const [newSubtaskText, setNewSubtaskText] = useState('')
 
+    // ==========================================================================
+    // EVENT HANDLERS
+    // ==========================================================================
+
+    /** Close modal when clicking backdrop */
     const handleBackdropClick = (e) => {
         if (e.target === e.currentTarget) onClose()
     }
 
+    /**
+     * Handle dropping subtasks on the grid area visible behind the modal
+     * This allows extracting subtasks directly to grid positions
+     */
     const handleDrop = (e) => {
         e.preventDefault()
         if (!onDrop || !gridRef.current) return
@@ -27,7 +66,11 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
         }
     }
 
-    // Handle Escape key
+    // ==========================================================================
+    // KEYBOARD HANDLING
+    // ==========================================================================
+
+    /** Close modal on Escape key */
     useEffect(() => {
         if (!isOpen) return
         const handleEsc = (e) => {
@@ -37,15 +80,26 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
         return () => window.removeEventListener('keydown', handleEsc)
     }, [isOpen, onClose])
 
+    // Don't render if not open or no task
     if (!isOpen || !task) return null
+
+    // ==========================================================================
+    // COMPUTED VALUES
+    // ==========================================================================
 
     const priority = (task.y * 0.6) + (task.x * 0.4)
 
+    // ==========================================================================
+    // SUBTASK HANDLERS
+    // ==========================================================================
+
+    /** Start adding a new subtask */
     const startAdding = () => {
         setIsAdding(true)
         setNewSubtaskText('')
     }
 
+    /** Submit the new subtask */
     const submitSubtask = (e) => {
         e.preventDefault()
         if (newSubtaskText.trim()) {
@@ -53,6 +107,10 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
             setNewSubtaskText('')
         }
     }
+
+    // ==========================================================================
+    // RENDER
+    // ==========================================================================
 
     return (
         <div
@@ -62,10 +120,13 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
             onDrop={handleDrop}
         >
             <div className="bg-white dark:bg-slate-800 rounded-[32px] shadow-2xl w-full max-w-lg p-10 animate-in zoom-in-95 duration-200 border border-transparent dark:border-slate-700">
+
+                {/* Header Section */}
                 <div className="flex justify-between items-start mb-6">
-                    {/* ... (existing header) ... */}
                     <div className="flex-1">
-                        <h2 className="text-3xl font-black text-slate-800 dark:text-white leading-tight pr-4">{task.text}</h2>
+                        <h2 className="text-3xl font-black text-slate-800 dark:text-white leading-tight pr-4">
+                            {task.text}
+                        </h2>
                         <div className="flex items-center gap-3 mt-3">
                             <span className="px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 text-[10px] font-black uppercase tracking-widest">
                                 Priority: {priority.toFixed(0)}
@@ -85,6 +146,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
                     </button>
                 </div>
 
+                {/* Subtasks Section */}
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 flex items-center gap-2">
@@ -105,6 +167,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
                         )}
                     </div>
 
+                    {/* Subtask List (draggable items) */}
                     <div className="space-y-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                         {task.subtasks?.map((sub) => (
                             <div
@@ -112,6 +175,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
                                 draggable
                                 onDragStart={(e) => {
                                     e.stopPropagation();
+                                    // Set drag data for subtask extraction
                                     e.dataTransfer.setData('application/json', JSON.stringify({
                                         type: 'SUBTASK_EXTRACT',
                                         taskId: task.id,
@@ -124,12 +188,13 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
                                 className="flex items-center gap-3 group/sub cursor-grab active:cursor-grabbing p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl transition-all"
                                 onClick={() => onToggleSubtask(task.id, sub.id)}
                             >
+                                {/* Checkbox */}
                                 <div className={`
-                  w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all
-                  ${sub.completed
+                                    w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all
+                                    ${sub.completed
                                         ? 'bg-emerald-500 border-emerald-500 shadow-sm'
                                         : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 group-hover/sub:border-indigo-300 dark:group-hover/sub:border-indigo-500'}
-                `}>
+                                `}>
                                     {sub.completed && (
                                         <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -142,6 +207,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
                             </div>
                         ))}
 
+                        {/* Add Subtask Form */}
                         {isAdding && (
                             <form onSubmit={submitSubtask} className="flex gap-2 p-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-indigo-100 dark:border-indigo-900/30 animate-in fade-in slide-in-from-top-2">
                                 <input
@@ -170,6 +236,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
                             </form>
                         )}
 
+                        {/* Empty State */}
                         {(!task.subtasks || task.subtasks.length === 0) && !isAdding && (
                             <div className="text-center py-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-700">
                                 <p className="text-sm font-bold text-slate-300 dark:text-slate-600">No sub-tasks defined</p>
@@ -178,6 +245,7 @@ export default function TaskDetailModal({ isOpen, onClose, task, onToggleSubtask
                     </div>
                 </div>
 
+                {/* Action Buttons */}
                 <div className="flex gap-4 border-t border-slate-100 dark:border-slate-700 pt-8">
                     <button
                         onClick={() => {

@@ -1,6 +1,30 @@
+/**
+ * TaskNode.jsx - Draggable Task Card Component
+ * 
+ * Renders an individual task or subtask on the Eisenhower Matrix grid.
+ * Supports both mouse and touch interactions for cross-platform compatibility.
+ * 
+ * Features:
+ * - Drag-and-drop positioning on the grid
+ * - Click to expand task details
+ * - Visual priority coloring based on urgency/importance
+ * - Color-coded accent for task family identification
+ * - Subtask return-to-parent detection
+ */
+
 import { useRef, useState, useEffect } from 'react'
 import { getTaskAccentColor } from '../utils/colorUtils'
 
+// ==========================================================================
+// HELPER FUNCTIONS
+// ==========================================================================
+
+/**
+ * Get gradient color class based on priority score
+ * Higher scores = warmer/more urgent colors
+ * @param {number} score - Priority score (0-100)
+ * @returns {string} Tailwind gradient classes
+ */
 function getPriorityColor(score) {
     if (score >= 80) return 'from-red-400 to-orange-400'
     if (score >= 60) return 'from-orange-400 to-amber-400'
@@ -9,8 +33,30 @@ function getPriorityColor(score) {
     return 'from-slate-300 to-slate-400'
 }
 
-export default function TaskNode({ task, onMove, onDelete, onExpand, containerRef, isSubtaskNode = false, parentAccentColor = null, onMouseEnter, onMouseLeave, isHighlighted = false, onReturnSubtask }) {
+// ==========================================================================
+// COMPONENT
+// ==========================================================================
+
+export default function TaskNode({
+    task,
+    onMove,
+    onDelete,
+    onExpand,
+    containerRef,
+    isSubtaskNode = false,
+    parentAccentColor = null,
+    onMouseEnter,
+    onMouseLeave,
+    isHighlighted = false,
+    onReturnSubtask
+}) {
+    // ==========================================================================
+    // STATE & REFS
+    // ==========================================================================
+
     const [isDragging, setIsDragging] = useState(false)
+
+    // Track drag state without causing re-renders
     const dragRef = useRef({
         startX: 0,
         startY: 0,
@@ -19,22 +65,39 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
         startTime: 0,
         totalDist: 0
     })
+
     const nodeRef = useRef(null)
 
-    // Use a ref for onMove to avoid stale closures in listeners
+    // Use ref for onMove to avoid stale closures in event listeners
     const onMoveRef = useRef(onMove)
     onMoveRef.current = onMove
 
+    // ==========================================================================
+    // COMPUTED VALUES
+    // ==========================================================================
+
+    // Calculate priority score: 60% importance + 40% urgency
     const priority = (task.y * 0.6) + (task.x * 0.4)
 
-    // Get accent color for this task (or use parent's if it's a subtask)
+    // Get accent color (inherit from parent if subtask)
     const accentColor = isSubtaskNode && parentAccentColor
         ? parentAccentColor
         : getTaskAccentColor(task.parentId || task.id)
 
+    const subtaskCount = task.subtasks?.length || 0
+    const completedCount = task.subtasks?.filter(s => s.completed)?.length || 0
+
+    // ==========================================================================
+    // DRAG HANDLERS
+    // ==========================================================================
+
     useEffect(() => {
         if (!isDragging) return
 
+        /**
+         * Handle mouse movement during drag
+         * Converts pixel movement to percentage coordinates
+         */
         const handleMouseMove = (e) => {
             if (!containerRef.current) return
 
@@ -42,20 +105,24 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
             const deltaX = e.clientX - dragRef.current.startX
             const deltaY = e.clientY - dragRef.current.startY
 
-            // Track movement distance for click vs drag threshold
+            // Track total distance for click/drag differentiation
             dragRef.current.totalDist = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
 
-            // Calculate new percentage based on mouse movement
+            // Calculate new position as percentage
             const newX = dragRef.current.initialTaskX + (deltaX / rect.width) * 100
             const newY = dragRef.current.initialTaskY - (deltaY / rect.height) * 100
 
-            // Clamp to 0-100
+            // Clamp to grid bounds (0-100%)
             const clampedX = Math.max(0, Math.min(100, newX))
             const clampedY = Math.max(0, Math.min(100, newY))
 
             onMoveRef.current(task.id, clampedX, clampedY)
         }
 
+        /**
+         * Handle drag end (mouse up or touch end)
+         * Determines if this was a click or a drag
+         */
         const handleMouseUp = (e) => {
             const clientX = e.clientX || (e.changedTouches ? e.changedTouches[0].clientX : 0)
             const clientY = e.clientY || (e.changedTouches ? e.changedTouches[0].clientY : 0)
@@ -65,13 +132,13 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
             const duration = Date.now() - dragRef.current.startTime
             const distance = dragRef.current.totalDist
 
-            // Threshold: < 200ms and < 5px distance = Click (Expand)
+            // Short, small movement = Click (expand task details)
             if (duration < 250 && distance < 6) {
                 onExpand(task.id)
                 return
             }
 
-            // Check if dropped on parent (for sub-tasks)
+            // Check if subtask was dropped back onto its parent task
             if (isSubtaskNode && task.parentId && onReturnSubtask) {
                 const parentNode = document.querySelector(`.task-node[data-task-id="${task.parentId}"]`)
 
@@ -91,30 +158,31 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
             }
         }
 
+        /**
+         * Handle touch movement during drag
+         * Similar to mouse but uses touch coordinates
+         */
         const handleTouchMove = (e) => {
             if (!containerRef.current) return
-            e.preventDefault() // Constructive default for touch
+            e.preventDefault() // Prevent scrolling while dragging
 
             const touch = e.touches[0]
-
             const rect = containerRef.current.getBoundingClientRect()
             const deltaX = touch.clientX - dragRef.current.startX
             const deltaY = touch.clientY - dragRef.current.startY
 
-            // Track movement distance
             dragRef.current.totalDist = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
 
-            // Calculate new percentage based on movement
             const newX = dragRef.current.initialTaskX + (deltaX / rect.width) * 100
             const newY = dragRef.current.initialTaskY - (deltaY / rect.height) * 100
 
-            // Clamp to 0-100
             const clampedX = Math.max(0, Math.min(100, newX))
             const clampedY = Math.max(0, Math.min(100, newY))
 
             onMoveRef.current(task.id, clampedX, clampedY)
         }
 
+        // Attach global listeners for drag tracking
         window.addEventListener('mousemove', handleMouseMove)
         window.addEventListener('mouseup', handleMouseUp)
         window.addEventListener('touchmove', handleTouchMove, { passive: false })
@@ -126,10 +194,14 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
             window.removeEventListener('touchmove', handleTouchMove)
             window.removeEventListener('touchend', handleMouseUp)
         }
-    }, [isDragging, task.id, containerRef, onExpand])
+    }, [isDragging, task.id, containerRef, onExpand, isSubtaskNode, task.parentId, onReturnSubtask])
 
+    /**
+     * Handle drag start (mouse down or touch start)
+     * Records initial position for delta calculations
+     */
     const handleMouseDown = (e) => {
-        // Only drag with left click and ignore if clicking delete button
+        // Only left-click, ignore clicks on buttons
         if ((e.type === 'mousedown' && e.button !== 0) || e.target.closest('button')) return
 
         const clientX = e.clientX || e.touches[0].clientX
@@ -145,18 +217,18 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
             totalDist: 0
         }
 
-        // Prevent default only for touch to stop scrolling, but allow mouse for clicking inputs
+        // Prevent default for proper drag behavior
         if (e.type === 'touchstart') {
             e.stopPropagation()
-            // e.preventDefault() is often needed but can block clicks, handled carefully
         } else {
             e.preventDefault()
             e.stopPropagation()
         }
     }
 
-    const subtaskCount = task.subtasks?.length || 0
-    const completedCount = task.subtasks?.filter(s => s.completed)?.length || 0
+    // ==========================================================================
+    // RENDER
+    // ==========================================================================
 
     return (
         <div
@@ -175,38 +247,43 @@ export default function TaskNode({ task, onMove, onDelete, onExpand, containerRe
                 left: `${task.x}%`,
                 bottom: `${task.y}%`,
                 transform: 'translate(-50%, 50%)',
-                touchAction: 'none', // Crucial for preventing scroll while dragging
+                touchAction: 'none', // Prevent scroll while dragging
                 ...(isHighlighted ? {
                     '--tw-ring-color': accentColor.glow,
                     '--tw-ring-offset-color': 'transparent'
                 } : {})
             }}
         >
+            {/* Task Card */}
             <div
                 className={`
-          rounded-2xl shadow-lg relative
-          ${isSubtaskNode
+                    rounded-2xl shadow-lg relative
+                    ${isSubtaskNode
                         ? 'p-2 min-w-[100px] max-w-[150px] bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-2'
                         : `p-3 min-w-[140px] max-w-[200px] bg-gradient-to-br ${getPriorityColor(priority)} text-white border-2 border-white/30`
                     }
-          font-semibold text-sm
-          ${isDragging ? 'ring-4 ring-indigo-200/50' : 'hover:shadow-xl'}
-        `}
+                    font-semibold text-sm
+                    ${isDragging ? 'ring-4 ring-indigo-200/50' : 'hover:shadow-xl'}
+                `}
                 style={isSubtaskNode ? {
                     borderLeftColor: accentColor.border,
                     borderLeftWidth: '4px'
                 } : {}}
             >
-                {/* Accent pip for parent tasks */}
+                {/* Color Accent Pip (for parent tasks) */}
                 {!isSubtaskNode && (
                     <div
                         className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900"
                         style={{ backgroundColor: accentColor.light }}
                     />
                 )}
+
+                {/* Task Text */}
                 <div className="flex items-start justify-between gap-2">
                     <span className={`leading-tight ${isSubtaskNode ? 'text-xs' : ''}`}>{task.text}</span>
                 </div>
+
+                {/* Footer: Priority Score & Subtask Count */}
                 {!isSubtaskNode && (
                     <div className="mt-1 flex justify-between items-center text-[10px] opacity-80 pt-1 border-t border-white/20">
                         <span>{priority.toFixed(0)} pts</span>
