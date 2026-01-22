@@ -230,6 +230,12 @@ export default function TaskNode({
     // RENDER
     // ==========================================================================
 
+    // Remap 0-100 coordinates to visual percentages with edge margins
+    // This ensures tasks at 0% or 100% don't clip outside the container
+    const EDGE_MARGIN = 8 // % margin on each side
+    const visualX = EDGE_MARGIN + (task.x / 100) * (100 - 2 * EDGE_MARGIN)
+    const visualY = EDGE_MARGIN + (task.y / 100) * (100 - 2 * EDGE_MARGIN)
+
     return (
         <div
             ref={nodeRef}
@@ -244,8 +250,8 @@ export default function TaskNode({
             onMouseLeave={onMouseLeave}
             data-task-id={task.id}
             style={{
-                left: `${task.x}%`,
-                bottom: `${task.y}%`,
+                left: `${visualX}%`,
+                bottom: `${visualY}%`,
                 transform: 'translate(-50%, 50%)',
                 touchAction: 'none', // Prevent scroll while dragging
                 ...(isHighlighted ? {
