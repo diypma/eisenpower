@@ -180,222 +180,225 @@ function App() {
             s.id === subtaskId ? { ...s, text: newText } : s
           )
         }
+      }
+      return task
+    }))
+  }
 
+  /** Toggle between light and dark theme */
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light')
+  }
 
-        /** Toggle between light and dark theme */
-        const toggleTheme = () => {
-          setTheme(prev => prev === 'light' ? 'dark' : 'light')
-        }
+  // ==========================================================================
+  // SUBTASK GRID OPERATIONS
+  // ==========================================================================
 
-        // ==========================================================================
-        // SUBTASK GRID OPERATIONS
-        // ==========================================================================
-
-        /** Handle dropping a subtask onto the grid to extract it */
-        const handleSubtaskDrop = (x, y, data) => {
-          if (data.type === 'SUBTASK_EXTRACT') {
-            setTasks(prev => prev.map(t => {
-              if (t.id === data.taskId) {
-                return {
-                  ...t,
-                  subtasks: t.subtasks.map(s =>
-                    s.id === data.subtaskId ? { ...s, x, y } : s
-                  )
-                }
-              }
-              return t
-            }))
-            setExpandedTaskId(null)
+  /** Handle dropping a subtask onto the grid to extract it */
+  const handleSubtaskDrop = (x, y, data) => {
+    if (data.type === 'SUBTASK_EXTRACT') {
+      setTasks(prev => prev.map(t => {
+        if (t.id === data.taskId) {
+          return {
+            ...t,
+            subtasks: t.subtasks.map(s =>
+              s.id === data.subtaskId ? { ...s, x, y } : s
+            )
           }
         }
+        return t
+      }))
+      setExpandedTaskId(null)
+    }
+  }
 
-        /** Return a subtask from the grid back to its parent task */
-        const handleReturnSubtask = (parentId, subtaskId) => {
-          setTasks(prev => prev.map(t => {
-            if (t.id === parentId) {
+  /** Return a subtask from the grid back to its parent task */
+  const handleReturnSubtask = (parentId, subtaskId) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id === parentId) {
+        return {
+          ...t,
+          subtasks: t.subtasks.map(s =>
+            s.id === subtaskId ? { ...s, x: undefined, y: undefined } : s
+          )
+        }
+      }
+      return t
+    }))
+  }
+
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
+
+  return (
+    <div className={`h-screen bg-white dark:bg-slate-900 font-sans text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200`}>
+
+      {/* Header Bar */}
+      <header className="px-8 py-4 flex justify-between items-center bg-white dark:bg-slate-900 z-50 relative shadow-sm dark:shadow-slate-800 border-b border-transparent dark:border-slate-800 transition-colors">
+        <h1 className="text-xl font-black tracking-tighter bg-gradient-to-br from-indigo-600 to-violet-700 dark:from-indigo-400 dark:to-violet-400 bg-clip-text text-transparent">
+          Eisenpower
+        </h1>
+        <div className="flex items-center gap-4">
+          <SettingsMenu
+            tasks={tasks}
+            setTasks={setTasks}
+            isDark={theme === 'dark'}
+            onToggleTheme={toggleTheme}
+          />
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 p-4 md:p-8 bg-slate-50/50 dark:bg-slate-950 transition-colors pb-24 md:pb-8 overflow-hidden">
+
+        {/* Eisenhower Matrix Grid */}
+        <div className={`flex-1 bg-white dark:bg-slate-900 rounded-2xl md:rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm relative p-0 md:p-2 z-0 transition-colors overflow-hidden ${activeTab === 'matrix' ? 'block' : 'hidden md:block'}`}>
+          <div className="absolute inset-0 md:inset-2" ref={graphContainerRef}>
+            <GraphPaper
+              onAddTask={handleOpenModal}
+              onDrop={handleSubtaskDrop}
+              zoom={zoom}
+              onZoomChange={setZoom}
+            >
+              {/* Main Tasks */}
+              {tasks.filter(task => !task.completed).map(task => (
+                <TaskNode
+                  key={task.id}
+                  task={task}
+                  onMove={moveTask}
+                  onDelete={deleteTask}
+                  onExpand={setExpandedTaskId}
+                  containerRef={graphContainerRef}
+                  onMouseEnter={() => setHoveredTaskFamily(task.id)}
+                  onMouseLeave={() => setHoveredTaskFamily(null)}
+                  isHighlighted={hoveredTaskFamily === task.id}
+                  onReturnSubtask={handleReturnSubtask}
+                />
+              ))}
+
+              {/* Positioned Sub-tasks (extracted to grid) */}
+              {tasks.filter(task => !task.completed).flatMap(task => {
+                const parentAccentColor = getTaskAccentColor(task.id)
+                return (task.subtasks || [])
+                  .filter(sub => sub.x !== undefined && sub.x !== null && !sub.completed)
+                  .map(sub => (
+                    <TaskNode
+                      key={sub.id}
+                      task={{ ...sub, isSubtask: true, parentId: task.id }}
+                      onMove={(id, x, y) => {
+                        setTasks(prev => prev.map(t => {
+                          if (t.id === task.id) {
+                            return {
+                              ...t,
+                              subtasks: t.subtasks.map(s =>
+                                s.id === id ? { ...s, x, y } : s
+                              )
+                            }
+                          }
+                          return t
+                        }))
+                      }}
+                      onDelete={(id) => {
+                        setTasks(prev => prev.map(t => {
+                          if (t.id === task.id) {
+                            return {
+                              ...t,
+                              subtasks: t.subtasks.map(s =>
+                                s.id === id ? { ...s, x: undefined, y: undefined } : s
+                              )
+                            }
+                          }
+                          return t
+                        }))
+                      }}
+                      onExpand={() => {
+                        setExpandedTaskId(task.id)
+                      }}
+                      containerRef={graphContainerRef}
+                      isSubtaskNode={true}
+                      parentAccentColor={parentAccentColor}
+                      onMouseEnter={() => setHoveredTaskFamily(task.id)}
+                      onMouseLeave={() => setHoveredTaskFamily(null)}
+                      isHighlighted={hoveredTaskFamily === task.id}
+                      onReturnSubtask={handleReturnSubtask}
+                    />
+                  ))
+              })}
+            </GraphPaper>
+          </div>
+        </div>
+
+        {/* Priority Panel (Sorted Task List) */}
+        <div className={`w-full md:w-[320px] flex-shrink-0 flex flex-col h-full overflow-hidden ${activeTab === 'list' ? 'flex' : 'hidden md:flex'}`}>
+          <PriorityPanel
+            tasks={tasks}
+            onToggleSubtask={toggleSubtask}
+            onExpandTask={setExpandedTaskId}
+            onCompleteTask={completeTask}
+          />
+        </div>
+      </main>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-around p-2 pb-safe z-50">
+        <button
+          onClick={() => setActiveTab('matrix')}
+          className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${activeTab === 'matrix' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500'}`}
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+          <span className="text-[10px] font-bold">Matrix</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('list')}
+          className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${activeTab === 'list' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500'}`}
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+          </svg>
+          <span className="text-[10px] font-bold">List</span>
+        </button>
+      </div>
+
+      {/* Task Creation Modal */}
+      <TaskModal
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState({ ...modalState, isOpen: false })}
+        onSubmit={handleCreateTask}
+        position={modalState}
+      />
+
+      {/* Task Detail/Edit Modal */}
+      <TaskDetailModal
+        isOpen={!!expandedTaskId}
+        task={tasks.find(t => t.id === expandedTaskId)}
+        onClose={() => setExpandedTaskId(null)}
+        onToggleSubtask={toggleSubtask}
+        onDelete={deleteTask}
+        onComplete={completeTask}
+        onEditTask={editTask}
+        onEditSubtask={editSubtask}
+        onAddSubtask={(taskId, text) => {
+          setTasks(prev => prev.map(task => {
+            if (task.id === taskId) {
               return {
-                ...t,
-                subtasks: t.subtasks.map(s =>
-                  s.id === subtaskId ? { ...s, x: undefined, y: undefined } : s
-                )
+                ...task,
+                subtasks: [...(task.subtasks || []), { id: Date.now(), text, completed: false }]
               }
             }
-            return t
+            return task
           }))
-        }
+        }}
+        onSubtaskDragStart={(taskId, subtask) => {
+          // Tracking hook for animations (currently unused)
+        }}
+        onDrop={handleSubtaskDrop}
+        gridRef={graphContainerRef}
+      />
+    </div>
+  )
+}
 
-        // ==========================================================================
-        // RENDER
-        // ==========================================================================
-
-        return (
-          <div className={`h-screen bg-white dark:bg-slate-900 font-sans text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200`}>
-
-            {/* Header Bar */}
-            <header className="px-8 py-4 flex justify-between items-center bg-white dark:bg-slate-900 z-50 relative shadow-sm dark:shadow-slate-800 border-b border-transparent dark:border-slate-800 transition-colors">
-              <h1 className="text-xl font-black tracking-tighter bg-gradient-to-br from-indigo-600 to-violet-700 dark:from-indigo-400 dark:to-violet-400 bg-clip-text text-transparent">
-                Eisenpower
-              </h1>
-              <div className="flex items-center gap-4">
-                <SettingsMenu
-                  tasks={tasks}
-                  setTasks={setTasks}
-                  isDark={theme === 'dark'}
-                  onToggleTheme={toggleTheme}
-                />
-              </div>
-            </header>
-
-            {/* Main Content Area */}
-            <main className="flex-1 flex flex-col md:flex-row gap-4 md:gap-8 p-4 md:p-8 bg-slate-50/50 dark:bg-slate-950 transition-colors pb-24 md:pb-8 overflow-hidden">
-
-              {/* Eisenhower Matrix Grid */}
-              <div className={`flex-1 bg-white dark:bg-slate-900 rounded-2xl md:rounded-[32px] border border-slate-100 dark:border-slate-800 shadow-sm relative p-0 md:p-2 z-0 transition-colors overflow-hidden ${activeTab === 'matrix' ? 'block' : 'hidden md:block'}`}>
-                <div className="absolute inset-0 md:inset-2" ref={graphContainerRef}>
-                  <GraphPaper
-                    onAddTask={handleOpenModal}
-                    onDrop={handleSubtaskDrop}
-                    zoom={zoom}
-                    onZoomChange={setZoom}
-                  >
-                    {/* Main Tasks */}
-                    {tasks.filter(task => !task.completed).map(task => (
-                      <TaskNode
-                        key={task.id}
-                        task={task}
-                        onMove={moveTask}
-                        onDelete={deleteTask}
-                        onExpand={setExpandedTaskId}
-                        containerRef={graphContainerRef}
-                        onMouseEnter={() => setHoveredTaskFamily(task.id)}
-                        onMouseLeave={() => setHoveredTaskFamily(null)}
-                        isHighlighted={hoveredTaskFamily === task.id}
-                        onReturnSubtask={handleReturnSubtask}
-                      />
-                    ))}
-
-                    {/* Positioned Sub-tasks (extracted to grid) */}
-                    {tasks.filter(task => !task.completed).flatMap(task => {
-                      const parentAccentColor = getTaskAccentColor(task.id)
-                      return (task.subtasks || [])
-                        .filter(sub => sub.x !== undefined && sub.x !== null && !sub.completed)
-                        .map(sub => (
-                          <TaskNode
-                            key={sub.id}
-                            task={{ ...sub, isSubtask: true, parentId: task.id }}
-                            onMove={(id, x, y) => {
-                              setTasks(prev => prev.map(t => {
-                                if (t.id === task.id) {
-                                  return {
-                                    ...t,
-                                    subtasks: t.subtasks.map(s =>
-                                      s.id === id ? { ...s, x, y } : s
-                                    )
-                                  }
-                                }
-                                return t
-                              }))
-                            }}
-                            onDelete={(id) => {
-                              setTasks(prev => prev.map(t => {
-                                if (t.id === task.id) {
-                                  return {
-                                    ...t,
-                                    subtasks: t.subtasks.map(s =>
-                                      s.id === id ? { ...s, x: undefined, y: undefined } : s
-                                    )
-                                  }
-                                }
-                                return t
-                              }))
-                            }}
-                            onExpand={() => {
-                              setExpandedTaskId(task.id)
-                            }}
-                            containerRef={graphContainerRef}
-                            isSubtaskNode={true}
-                            parentAccentColor={parentAccentColor}
-                            onMouseEnter={() => setHoveredTaskFamily(task.id)}
-                            onMouseLeave={() => setHoveredTaskFamily(null)}
-                            isHighlighted={hoveredTaskFamily === task.id}
-                            onReturnSubtask={handleReturnSubtask}
-                          />
-                        ))
-                    })}
-                  </GraphPaper>
-                </div>
-              </div>
-
-              {/* Priority Panel (Sorted Task List) */}
-              <div className={`w-full md:w-[320px] flex-shrink-0 flex flex-col h-full overflow-hidden ${activeTab === 'list' ? 'flex' : 'hidden md:flex'}`}>
-                <PriorityPanel
-                  tasks={tasks}
-                  onToggleSubtask={toggleSubtask}
-                  onExpandTask={setExpandedTaskId}
-                  onCompleteTask={completeTask}
-                />
-              </div>
-            </main>
-
-            {/* Mobile Bottom Navigation */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-around p-2 pb-safe z-50">
-              <button
-                onClick={() => setActiveTab('matrix')}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${activeTab === 'matrix' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500'}`}
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-                <span className="text-[10px] font-bold">Matrix</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('list')}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${activeTab === 'list' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500'}`}
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                </svg>
-                <span className="text-[10px] font-bold">List</span>
-              </button>
-            </div>
-
-            {/* Task Creation Modal */}
-            <TaskModal
-              isOpen={modalState.isOpen}
-              onClose={() => setModalState({ ...modalState, isOpen: false })}
-              onSubmit={handleCreateTask}
-              position={modalState}
-            />
-
-            {/* Task Detail/Edit Modal */}
-            <TaskDetailModal
-              isOpen={!!expandedTaskId}
-              task={tasks.find(t => t.id === expandedTaskId)}
-              onClose={() => setExpandedTaskId(null)}
-              onToggleSubtask={toggleSubtask}
-              onDelete={deleteTask}
-              onComplete={completeTask}
-              onEditTask={editTask}
-              onEditSubtask={editSubtask}
-              onAddSubtask={(taskId, text) => {
-                setTasks(prev => prev.map(task => {
-                  if (task.id === taskId) {
-                    return {
-                      ...task,
-                      subtasks: [...(task.subtasks || []), { id: Date.now(), text, completed: false }]
-                    }
-                  }
-                  return task
-                }))
-              }}
-              onSubtaskDragStart={(taskId, subtask) => {
-                // Tracking hook for animations (currently unused)
-              }}
-              onDrop={handleSubtaskDrop}
-              gridRef={graphContainerRef}
-            />
-          </div>
-        )
-      }
-
-      export default App
+export default App
