@@ -17,6 +17,7 @@ import React, { useRef } from 'react'
 
 export default function GraphPaper({ onAddTask, onDrop, zoom = 1, onZoomChange, children }) {
     const containerRef = useRef(null)
+    const lastDragEndTime = useRef(0) // Track when dragging ended
 
     // ==========================================================================
     // DRAG AND DROP HANDLERS
@@ -63,6 +64,12 @@ export default function GraphPaper({ onAddTask, onDrop, zoom = 1, onZoomChange, 
      * Distinguishes between clicks on tasks vs empty grid space
      */
     const handleClick = (e) => {
+        // Ignore clicks that happen shortly after a drag ended (prevents false clicks after dragging)
+        const timeSinceLastDrag = Date.now() - lastDragEndTime.current
+        if (timeSinceLastDrag < 100) {
+            return
+        }
+
         // Get coordinates (handle both mouse and touch events)
         let clientX, clientY
 
@@ -150,6 +157,18 @@ export default function GraphPaper({ onAddTask, onDrop, zoom = 1, onZoomChange, 
                 onClick={handleClick}
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
+                onMouseUp={(e) => {
+                    // Track when dragging ends to prevent false clicks
+                    if (e.target.closest('.task-node')) {
+                        lastDragEndTime.current = Date.now()
+                    }
+                }}
+                onTouchEnd={(e) => {
+                    // Track when dragging ends to prevent false clicks
+                    if (e.target.closest('.task-node')) {
+                        lastDragEndTime.current = Date.now()
+                    }
+                }}
                 className="relative w-full h-full graph-clickable cursor-crosshair"
                 style={{
                     // Dot grid pattern

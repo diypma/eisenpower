@@ -232,7 +232,7 @@ export default function TaskNode({
 
     // Remap 0-100 coordinates to visual percentages with edge margins
     // This ensures tasks at 0% or 100% don't clip outside the container
-    const EDGE_MARGIN = 8 // % margin on each side
+    const EDGE_MARGIN = 3 // % margin on each side (reduced from 8 to match smaller container padding)
     const visualX = EDGE_MARGIN + (task.x / 100) * (100 - 2 * EDGE_MARGIN)
     const visualY = EDGE_MARGIN + (task.y / 100) * (100 - 2 * EDGE_MARGIN)
 
