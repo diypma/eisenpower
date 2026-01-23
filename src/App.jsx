@@ -106,7 +106,8 @@ function App() {
   // Tracking refs to ensure sync logic always uses the latest state
   const tasksRef = useRef(tasks)
   const deletedTasksRef = useRef(deletedTasks)
-  const isSyncingRef = useRef(false) // Prevents sync loops
+  const lastSyncedDataRef = useRef(null) // Stores JSON string of last successful sync
+  const syncInProgressRef = useRef(false) // Prevents overlapping concurrent writes
 
   useEffect(() => { tasksRef.current = tasks }, [tasks])
   useEffect(() => { deletedTasksRef.current = deletedTasks }, [deletedTasks])
@@ -155,48 +156,48 @@ function App() {
       const cloudTasks = (data && data.tasks) ? data.tasks : []
       const cloudDeleted = (data && data.deleted_tasks) ? data.deleted_tasks : []
 
-      // 1. Merge Recycle Bin (Deleted Tasks)
-      setDeletedTasks(prevLocalDeleted => {
-        const deletedMap = new Map()
-        // Union of both, taking newest version (LWW)
-        const allDeleted = [...prevLocalDeleted, ...cloudDeleted]
-        allDeleted.forEach(t => {
-          const existing = deletedMap.get(t.id)
-          const currentVersion = (t.updatedAt || t.id)
-          const existingVersion = existing ? (existing.updatedAt || existing.id) : -1
-          if (currentVersion >= existingVersion) {
-            deletedMap.set(t.id, t)
-          }
-        })
-        const mergedDeleted = Array.from(deletedMap.values())
-
-        // 2. Merge Main Tasks using the NEWLY calculated mergedDeleted
-        setTasks(currentLocalTasks => {
-          const localMap = new Map(currentLocalTasks.map(t => [t.id, t]))
-          const cloudMap = new Map(cloudTasks.map(t => [t.id, t]))
-          const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
-          const deletedMapForTasks = new Map(mergedDeleted.map(t => [t.id, t]))
-          const merged = []
-
-          allIds.forEach(id => {
-            const local = localMap.get(id)
-            const cloud = cloudMap.get(id)
-
-            if (local && cloud) {
-              const localTime = local.updatedAt || local.id
-              const cloudTime = cloud.updatedAt || cloud.id
-              merged.push(localTime >= cloudTime ? local : cloud)
-            } else if (cloud) {
-              if (!deletedMapForTasks.has(id)) merged.push(cloud)
-            } else if (local) {
-              if (!deletedMapForTasks.has(id)) merged.push(local)
-            }
-          })
-          return merged
-        })
-
-        return mergedDeleted
+      // ATOMIC MERGE CALCULATION
+      // 1. Calculate merged Deleted Tasks
+      const deletedMap = new Map()
+      const allDeleted = [...deletedTasksRef.current, ...cloudDeleted]
+      allDeleted.forEach(t => {
+        const existing = deletedMap.get(t.id)
+        const currentVersion = (t.updatedAt || t.id)
+        const existingVersion = existing ? (existing.updatedAt || existing.id) : -1
+        if (currentVersion >= existingVersion) {
+          deletedMap.set(t.id, t)
+        }
       })
+      const finalDeleted = Array.from(deletedMap.values())
+
+      // 2. Calculate merged Main Tasks using finalDeleted
+      const localMap = new Map(tasksRef.current.map(t => [t.id, t]))
+      const cloudMap = new Map(cloudTasks.map(t => [t.id, t]))
+      const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
+      const finalDeletedMap = new Map(finalDeleted.map(t => [t.id, t]))
+      const finalTasks = []
+
+      allIds.forEach(id => {
+        const local = localMap.get(id)
+        const cloud = cloudMap.get(id)
+        if (local && cloud) {
+          const localTime = local.updatedAt || local.id
+          const cloudTime = cloud.updatedAt || cloud.id
+          finalTasks.push(localTime >= cloudTime ? local : cloud)
+        } else if (cloud) {
+          if (!finalDeletedMap.has(id)) finalTasks.push(cloud)
+        } else if (local) {
+          if (!finalDeletedMap.has(id)) finalTasks.push(local)
+        }
+      })
+
+      // Update state once with calculated values
+      setDeletedTasks(finalDeleted)
+      setTasks(finalTasks)
+
+      // Update the "last seen" ref to prevent a feedback loop upload
+      lastSyncedDataRef.current = JSON.stringify({ tasks: finalTasks, deleted_tasks: finalDeleted })
+
       console.log('🔄 Cloud data merged successfully')
     } catch (err) {
       console.error('❌ Error loading cloud data:', err)
@@ -208,15 +209,25 @@ function App() {
     if (!session) return
 
     const timer = setTimeout(async () => {
-      // Check if we are already syncing or if there's no data to sync
-      if (isSyncingRef.current) return
+      // 1. Check if a sync is already in flight
+      if (syncInProgressRef.current) return
 
+      // 2. Prepare payload and check for changes since last success
+      const currentData = { tasks, deleted_tasks: deletedTasks }
+      const currentHash = JSON.stringify(currentData)
+
+      if (currentHash === lastSyncedDataRef.current) {
+        // console.log('✅ Data already synced, skipping upload')
+        return
+      }
+
+      // SAFEGUARD: Don't sync empty data on initial load if we've never synced before
       if (tasks.length === 0 && deletedTasks.length === 0) {
         if (!localStorage.getItem('eisenpower-has-synced')) return
       }
 
       try {
-        isSyncingRef.current = true
+        syncInProgressRef.current = true
         localStorage.setItem('eisenpower-tasks-backup', JSON.stringify(tasks))
 
         const { error } = await supabase
@@ -233,16 +244,16 @@ function App() {
         if (error) {
           console.error('❌ Sync error:', error.message || error)
         } else {
+          lastSyncedDataRef.current = currentHash
           localStorage.setItem('eisenpower-has-synced', 'true')
           console.log(`📤 Synced: ${tasks.length} tasks`)
         }
       } catch (err) {
         console.error('❌ Sync catch:', err)
       } finally {
-        // Prevent immediate re-sync from realtime event that WE just triggered
-        setTimeout(() => { isSyncingRef.current = false }, 2000)
+        syncInProgressRef.current = false
       }
-    }, 1000)
+    }, 1500) // Increased debounce to 1.5s for stability
 
     return () => clearTimeout(timer)
   }, [tasks, deletedTasks, session])
@@ -262,14 +273,16 @@ function App() {
           filter: `user_id=eq.${session.user.id}`
         },
         (payload) => {
-          // Ignore updates triggered by our own local syncing
-          if (isSyncingRef.current) return
-
-          console.log('☁️ Remote change detected')
+          // Always listen for remote changes. The LWW merge handles consistency.
+          console.log('☁️ Remote change detected', payload.eventType)
           loadCloudData()
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Realtime connected')
+        }
+      })
 
     return () => {
       supabase.removeChannel(channel)
@@ -630,7 +643,7 @@ function App() {
           className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-colors ${activeTab === 'list' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500'}`}
         >
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
           </svg>
           <span className="text-[10px] font-bold">List</span>
         </button>
@@ -669,8 +682,6 @@ function App() {
         onSubtaskDragStart={(taskId, subtask) => {
           // Tracking hook for animations (currently unused)
         }}
-        onDrop={handleSubtaskDrop}
-        gridRef={graphContainerRef}
       />
     </div>
   )
