@@ -108,15 +108,17 @@ function App() {
       if (error) throw error
 
       if (data && data.tasks) {
-        // Merge cloud tasks with current local tasks
         setTasks(currentLocalTasks => {
           const cloudTasks = data.tasks
-          const combined = [...cloudTasks]
 
-          // Add any local tasks that aren't in cloud (newly created while offline)
-          currentLocalTasks.forEach(localTask => {
-            if (!cloudTasks.find(ct => ct.id === localTask.id)) {
-              combined.push(localTask)
+          // Strategy: localStorage is the master source of truth.
+          // 1. Keep everything in our current local state (includes offline edits).
+          const combined = [...currentLocalTasks]
+
+          // 2. Only add tasks from the cloud that we DON'T have locally.
+          cloudTasks.forEach(cloudTask => {
+            if (!currentLocalTasks.find(lt => lt.id === cloudTask.id)) {
+              combined.push(cloudTask)
             }
           })
 

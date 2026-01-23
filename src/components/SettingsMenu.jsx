@@ -76,6 +76,80 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
     }
 
     // ==========================================================================
+    // TEXT EXPORT HANDLER
+    // ==========================================================================
+
+    /**
+     * Export tasks as human-readable text file
+     * Useful for sharing or printing task lists
+     */
+    const handleExport = () => {
+        let content = "EISENPOWER TASKS EXPORT\n"
+        content += `Date: ${new Date().toLocaleString()}\n`
+        content += "================================\n\n"
+
+        // Separate active and completed tasks
+        const activeTasks = tasks.filter(t => !t.completed)
+        const completedTasks = tasks.filter(t => t.completed)
+
+        // Sort by priority score (same algorithm as PriorityPanel)
+        const sortedActive = [...activeTasks].sort((a, b) => {
+            const scoreA = (a.y * 0.6) + (a.x * 0.4)
+            const scoreB = (b.y * 0.6) + (b.x * 0.4)
+            return scoreB - scoreA
+        })
+
+        content += "ACTIVE TASKS\n"
+        content += "------------\n\n"
+
+        sortedActive.forEach((task, index) => {
+            const score = (task.y * 0.6) + (task.x * 0.4)
+            content += `${index + 1}. ${task.text} [Score: ${score.toFixed(0)}]\n`
+            content += `   Position: Urgency ${task.x.toFixed(0)} / Importance ${task.y.toFixed(0)}\n`
+
+            if (task.subtasks && task.subtasks.length > 0) {
+                task.subtasks.forEach(sub => {
+                    const status = sub.completed ? "[x]" : "[ ]"
+                    const positioned = (sub.x !== undefined && sub.x !== null) ? " [ON GRID]" : ""
+                    content += `   - ${status} ${sub.text}${positioned}\n`
+                })
+            } else {
+                content += `   (No subtasks)\n`
+            }
+            content += "\n"
+        })
+
+        if (completedTasks.length > 0) {
+            content += "\nCOMPLETED TASKS\n"
+            content += "---------------\n\n"
+
+            completedTasks.forEach((task, index) => {
+                const completedDate = task.completedAt ? new Date(task.completedAt).toLocaleDateString() : 'Unknown'
+                content += `${index + 1}. [COMPLETED] ${task.text}\n`
+                content += `   Completed: ${completedDate}\n`
+
+                if (task.subtasks && task.subtasks.length > 0) {
+                    const completedSubs = task.subtasks.filter(s => s.completed).length
+                    content += `   Sub-tasks: ${completedSubs}/${task.subtasks.length} completed\n`
+                }
+                content += "\n"
+            })
+        }
+
+        const blob = new Blob([content], { type: "text/plain" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `eisenpower_export_${new Date().toISOString().split('T')[0]}.txt`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+
+        setIsOpen(false)
+    }
+
+    // ==========================================================================
     // RENDER
     // ==========================================================================
 
@@ -198,6 +272,20 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                     {isDark ? 'Light Mode' : 'Dark Mode'}
                                 </span>
                                 <span className="text-[10px] text-slate-400">Switch theme</span>
+                            </div>
+                        </button>
+
+                        {/* Export Button */}
+                        <button
+                            onClick={handleExport}
+                            className="w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 transition-colors group"
+                        >
+                            <svg className="w-5 h-5 text-slate-400 group-hover:text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Export Tasks</span>
+                                <span className="text-[10px] text-slate-400">Download .txt file</span>
                             </div>
                         </button>
 
