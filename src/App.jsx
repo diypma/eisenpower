@@ -500,15 +500,15 @@ function App() {
     ))
   }
 
-  /** Edit subtask text */
-  const editSubtask = (taskId, subtaskId, newText) => {
+  /** Update subtask specific fields */
+  const updateSubtask = (taskId, subtaskId, updates) => {
     setTasks(prev => prev.map(task => {
       if (task.id === taskId) {
         return {
           ...task,
           updatedAt: Date.now(),
           subtasks: task.subtasks.map(s =>
-            s.id === subtaskId ? { ...s, text: newText } : s
+            s.id === subtaskId ? { ...s, ...updates } : s
           )
         }
       }
@@ -724,7 +724,7 @@ function App() {
         onDelete={deleteTask}
         onComplete={completeTask}
         onUpdateTask={updateTask}
-        onEditSubtask={editSubtask}
+        onUpdateSubtask={updateSubtask}
         onAddSubtask={(taskId, text) => {
           setTasks(prev => prev.map(task => {
             if (task.id === taskId) {

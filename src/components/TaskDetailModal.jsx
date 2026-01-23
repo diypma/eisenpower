@@ -5,8 +5,8 @@
  * Supports dragging subtasks out to the grid for independent tracking.
  * 
  * Features:
- * - View/edit task details
- * - Toggle subtask completion
+ * - View/edit task details & notes
+ * - Toggle subtask completion & notes
  * - Add new subtasks
  * - Drag subtasks to grid for visual positioning
  * - Delete or complete tasks
@@ -25,7 +25,7 @@ export default function TaskDetailModal({
     onSubtaskDragStart,
     onAddSubtask,
     onUpdateTask,
-    onEditSubtask,
+    onUpdateSubtask,
     onDrop,
     gridRef
 }) {
@@ -39,6 +39,7 @@ export default function TaskDetailModal({
     const [editedTaskTitle, setEditedTaskTitle] = useState('')
     const [editingSubtaskId, setEditingSubtaskId] = useState(null)
     const [editedSubtaskText, setEditedSubtaskText] = useState('')
+    const [expandedSubtaskNotes, setExpandedSubtaskNotes] = useState(new Set())
 
     /** Reset state when task changes */
     useEffect(() => {
@@ -48,6 +49,7 @@ export default function TaskDetailModal({
         setNewSubtaskText('')
         setEditingSubtaskId(null)
         setEditedSubtaskText('')
+        setExpandedSubtaskNotes(new Set())
     }, [task?.id, isOpen])
 
     /** Handle direct updates for new fields */
@@ -152,9 +154,17 @@ export default function TaskDetailModal({
     /** Save edited subtask */
     const saveSubtask = () => {
         if (editedSubtaskText.trim()) {
-            onEditSubtask(task.id, editingSubtaskId, editedSubtaskText.trim())
+            onUpdateSubtask(task.id, editingSubtaskId, { text: editedSubtaskText.trim() })
         }
         setEditingSubtaskId(null)
+    }
+
+    /** Toggle subtask notes expansion */
+    const toggleSubtaskNotes = (subtaskId) => {
+        const next = new Set(expandedSubtaskNotes)
+        if (next.has(subtaskId)) next.delete(subtaskId)
+        else next.add(subtaskId)
+        setExpandedSubtaskNotes(next)
     }
 
     // ==========================================================================
@@ -289,6 +299,19 @@ export default function TaskDetailModal({
                     )}
                 </div>
 
+                {/* Task Notes Section */}
+                <div className="mb-8">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2">
+                        Task Notes
+                    </label>
+                    <textarea
+                        placeholder="Add notes, bullet points (-), or checklists ([ ])..."
+                        value={task.notes || ''}
+                        onChange={(e) => handleFieldUpdate('notes', e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-700/50 rounded-2xl p-4 text-sm text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all min-h-[100px] whitespace-pre-wrap custom-scrollbar font-medium"
+                    />
+                </div>
+
                 {/* Subtasks Section */}
                 <div className="mb-8">
                     <div className="flex justify-between items-center mb-4">
@@ -386,6 +409,31 @@ export default function TaskDetailModal({
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                             </svg>
                                         </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                toggleSubtaskNotes(sub.id)
+                                            }}
+                                            className={`p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-all ${sub.notes ? 'text-indigo-500 opacity-100' : 'text-slate-400 opacity-0 group-hover/subtask:opacity-100'}`}
+                                            title="Sub-task notes"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Subtask Notes Area (Expandable) */}
+                                {expandedSubtaskNotes.has(sub.id) && (
+                                    <div className="mt-1 ml-10 p-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-700/50 animate-in slide-in-from-top-1 duration-200">
+                                        <textarea
+                                            autoFocus
+                                            placeholder="Sub-task notes..."
+                                            value={sub.notes || ''}
+                                            onChange={(e) => onUpdateSubtask(task.id, sub.id, { notes: e.target.value })}
+                                            className="w-full bg-transparent border-none outline-none text-xs text-slate-600 dark:text-slate-400 min-h-[60px] whitespace-pre-wrap resize-none custom-scrollbar"
+                                        />
                                     </div>
                                 )}
                             </div>
