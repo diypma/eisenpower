@@ -11,13 +11,19 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import { supabase } from '../lib/supabase'
 
-export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme }) {
+export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, session }) {
     // ==========================================================================
     // STATE & REFS
     // ==========================================================================
 
     const [isOpen, setIsOpen] = useState(false)
+    const [email, setEmail] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [message, setMessage] = useState(null)
+    const [showLogin, setShowLogin] = useState(false)
+
     const menuRef = useRef(null)
     const fileInputRef = useRef(null)
 
@@ -165,6 +171,39 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme })
     }
 
     // ==========================================================================
+    // AUTH HANDLER
+    // ==========================================================================
+
+    const handleLogin = async (e) => {
+        e.preventDefault()
+        setLoading(true)
+        setMessage(null)
+
+        try {
+            const { error } = await supabase.auth.signInWithOtp({
+                email,
+                options: {
+                    emailRedirectTo: window.location.origin
+                }
+            })
+            if (error) throw error
+            setMessage('Check your email for the login link!')
+        } catch (error) {
+            console.error(error)
+            alert(error.error_description || error.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut()
+        setIsOpen(false)
+    }
+
+
+
+    // ==========================================================================
     // RENDER
     // ==========================================================================
 
@@ -195,6 +234,84 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme })
             {isOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-100">
                     <div className="p-1">
+                        {/* Cloud Sync / Account Section */}
+                        <div className="px-4 py-2">
+                            {session ? (
+                                <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-4 mb-2">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-300">
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Cloud Sync Active</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{session.user.email}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="w-full py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                                    >
+                                        Sign Out
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="mb-2">
+                                    {!showLogin ? (
+                                        <button
+                                            onClick={() => setShowLogin(true)}
+                                            className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-sm font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                                            </svg>
+                                            Turn On Cloud Sync
+                                        </button>
+                                    ) : (
+                                        <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700">
+                                            <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-2">Sign In</h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                                                Enter your email to receive a magic login link. No password needed.
+                                            </p>
+                                            {message ? (
+                                                <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-xs p-3 rounded-lg mb-3">
+                                                    {message}
+                                                </div>
+                                            ) : (
+                                                <form onSubmit={handleLogin}>
+                                                    <input
+                                                        type="email"
+                                                        placeholder="name@example.com"
+                                                        value={email}
+                                                        onChange={(e) => setEmail(e.target.value)}
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                        required
+                                                    />
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowLogin(false)}
+                                                            className="flex-1 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                        <button
+                                                            type="submit"
+                                                            disabled={loading}
+                                                            className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 disabled:opacity-50"
+                                                        >
+                                                            {loading ? 'Sending...' : 'Send Link'}
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            <div className="h-px bg-slate-100 dark:bg-slate-700 my-2" />
+                        </div>
                         {/* Backup Button */}
                         <button
                             onClick={handleBackup}

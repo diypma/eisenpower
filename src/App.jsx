@@ -22,6 +22,7 @@ import TaskModal from './components/TaskModal'
 import TaskDetailModal from './components/TaskDetailModal'
 import SettingsMenu from './components/SettingsMenu'
 import { getTaskAccentColor } from './utils/colorUtils'
+import { supabase } from './lib/supabase'
 
 function App() {
   // ==========================================================================
@@ -62,6 +63,104 @@ function App() {
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('eisenpower-theme') || 'light'
   })
+
+  // Supabase Session State
+  const [session, setSession] = useState(null)
+  const isSyncing = useRef(false) // Ref to prevent loops
+
+  // ==========================================================================
+  // CLOUD SYNC
+  // ==========================================================================
+
+  /** Initialize Auth Listener */
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  /** Load data from cloud on login */
+  useEffect(() => {
+    if (session) {
+      loadCloudData()
+    }
+  }, [session])
+
+  /**
+   * Load tasks from Supabase
+   * Merge strategy: Combine Cloud and Local tasks. Unique by ID.
+   * If conflict, Cloud wins (to enable cross-device sync).
+   */
+  const loadCloudData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_data')
+        .select('tasks')
+        .maybeSingle()
+
+      if (error) throw error
+
+      if (data && data.tasks) {
+        // Merge cloud tasks with current local tasks
+        setTasks(currentLocalTasks => {
+          const cloudTasks = data.tasks
+          const combined = [...cloudTasks]
+
+          // Add any local tasks that aren't in cloud (newly created while offline)
+          currentLocalTasks.forEach(localTask => {
+            if (!cloudTasks.find(ct => ct.id === localTask.id)) {
+              combined.push(localTask)
+            }
+          })
+
+          return combined
+        })
+      }
+    } catch (err) {
+      console.error('Error loading cloud data:', err)
+    }
+  }
+
+  /** Sync to cloud on change (Debounced) */
+  useEffect(() => {
+    if (!session) return
+
+    const timer = setTimeout(async () => {
+      try {
+        const user = session.user
+
+        // Check if row exists
+        const { data: existingRow } = await supabase
+          .from('user_data')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (existingRow) {
+          await supabase
+            .from('user_data')
+            .update({ tasks: tasks })
+            .eq('id', existingRow.id)
+        } else {
+          await supabase
+            .from('user_data')
+            .insert({ user_id: user.id, tasks: tasks })
+        }
+      } catch (err) {
+        console.error('Error syncing to cloud:', err)
+      }
+    }, 2000) // 2 second debounce
+
+    return () => clearTimeout(timer)
+  }, [tasks, session])
 
   // Modal and UI state
   const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
@@ -245,6 +344,7 @@ function App() {
             setTasks={setTasks}
             isDark={theme === 'dark'}
             onToggleTheme={toggleTheme}
+            session={session}
           />
         </div>
       </header>
