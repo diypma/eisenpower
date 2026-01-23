@@ -11,7 +11,13 @@
  * - Mobile-responsive tabbed interface
  * - LocalStorage + Supabase Cloud Sync
  * - Zoom controls for dense task layouts
+ * 
+ * 🚀 AI AGENT INSTRUCTION:
+ * When pushing a significant update or fixing a bug, YOU MUST increment the "version" 
+ * in 'package.json'. This version is displayed in the UI header.
  */
+
+import pkg from '../package.json'
 
 import { useState, useRef, useEffect } from 'react'
 import GraphPaper from './components/GraphPaper'
@@ -344,8 +350,13 @@ function App() {
 
       {/* Header Bar */}
       <header className="px-8 py-4 flex justify-between items-center bg-white dark:bg-slate-900 z-50 relative shadow-sm dark:shadow-slate-800 border-b border-transparent dark:border-slate-800 transition-colors">
-        <h1 className="text-xl font-black tracking-tighter bg-gradient-to-br from-indigo-600 to-violet-700 dark:from-indigo-400 dark:to-violet-400 bg-clip-text text-transparent">
-          Eisenpower
+        <h1 className="flex items-baseline gap-2">
+          <span className="text-xl font-black tracking-tighter bg-gradient-to-br from-indigo-600 to-violet-700 dark:from-indigo-400 dark:to-violet-400 bg-clip-text text-transparent">
+            Eisenpower
+          </span>
+          <span className="text-[10px] font-medium text-slate-300 dark:text-slate-700 tracking-widest select-none">
+            v{pkg.version}
+          </span>
         </h1>
         <div className="flex items-center gap-4">
           <SettingsMenu
