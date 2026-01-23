@@ -70,7 +70,10 @@ export default function TaskNode({
 
     // Use ref for onMove to avoid stale closures in event listeners
     const onMoveRef = useRef(onMove)
-    onMoveRef.current = onMove
+
+    useEffect(() => {
+        onMoveRef.current = onMove
+    }, [onMove])
 
     // ==========================================================================
     // COMPUTED VALUES

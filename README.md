@@ -17,11 +17,14 @@ A beautiful, interactive Eisenhower Matrix task management application built wit
 - **Click to Add** - Click anywhere on the grid to create a new task at that position
 - **Dark/Light Theme** - Full dark mode support with smooth transitions
 - **Mobile Responsive** - Tabbed interface for mobile devices with bottom navigation
-- **Zoom Controls** - Scale the grid for dense task layouts (appears when >5 tasks)
 
 ### Data Management
-- **LocalStorage Persistence** - Tasks and theme saved automatically
-- **JSON Backup/Restore** - Export tasks to JSON for cross-device sync via iCloud/cloud storage
+- **Local-First Design** - Zero latency, works offline
+- **Cloud Sync v2.0 (Conflict-Resistant)** - Robust multi-device sync with:
+    - **Granular Merging** - Per-task timestamps prevent overwrites
+    - **Loop Suppression** - Prevents "echoes" and reverts
+    - **Realtime Updates** - Instant changes across devices
+- **JSON Backup/Restore** - Manual backup option
 - **Text Export** - Human-readable task list export
 
 ## 🚀 Getting Started
@@ -29,6 +32,7 @@ A beautiful, interactive Eisenhower Matrix task management application built wit
 ### Prerequisites
 - Node.js 18+
 - npm or yarn
+- Supabase project (for sync)
 
 ### Installation
 
@@ -59,6 +63,8 @@ eisenpower/
 │   ├── App.jsx              # Main application component
 │   ├── main.jsx             # React entry point
 │   ├── index.css            # Global styles & Tailwind config
+│   ├── lib/
+│   │   └── supabase.js      # Supabase client & connection
 │   ├── components/
 │   │   ├── GraphPaper.jsx   # Eisenhower Matrix grid
 │   │   ├── TaskNode.jsx     # Draggable task card
@@ -99,29 +105,12 @@ Tasks are scored using a weighted formula:
 ### Theme
 Theme preference is stored in `localStorage` under `eisenpower-theme`.
 
-### Task Data
-Tasks are persisted to `localStorage` under `eisenpower-tasks` as JSON.
-
-Task schema:
-```javascript
-{
-  id: number,
-  text: string,
-  x: number,        // 0-100 (urgency)
-  y: number,        // 0-100 (importance)
-  completed?: boolean,
-  completedAt?: string,  // ISO date
-  subtasks: [
-    {
-      id: number,
-      text: string,
-      completed: boolean,
-      x?: number,   // If positioned on grid
-      y?: number
-    }
-  ]
-}
-```
+### Data Storage & Sync
+Eisenpower uses a "Local-First" architecture. 
+- **Persistence**: All data is saved to `localStorage` immediately.
+- **Sync**: When signed in, data is synced to Supabase `user_data` table.
+    - **Conflict Resolution**: Last-Write-Wins (LWW) per task.
+    - **Offline**: Works offline, syncs when connection restores.
 
 ## 📱 Mobile Support
 
@@ -131,12 +120,13 @@ On mobile devices:
 - Viewport configured to prevent zoom on input focus
 - Safe area handling for notched devices
 
-## 🔄 Data Sync (Manual)
+## 🔄 Data Sync
 
-Since the app is client-side only, sync between devices using:
-
-1. **Backup** - Settings → Backup Tasks → Save `.json` to iCloud Drive / cloud storage
-2. **Restore** - Settings → Restore Tasks → Select `.json` file
+Eisenpower v1.3+ features **Robust Cloud Sync v2.0**:
+1. Click the **Gear Icon**
+2. Select **Turn On Cloud Sync**
+3. Sign in via Magic Link
+4. Sync is automatic and realtime
 
 ## 📄 License
 

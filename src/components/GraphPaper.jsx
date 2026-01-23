@@ -128,7 +128,7 @@ export default function GraphPaper({ onAddTask, onDrop, children }) {
                 <div className="absolute top-1/2 right-4 translate-y-2 text-[10px] font-black uppercase tracking-tighter text-slate-400 dark:text-slate-500 pointer-events-none select-none">
                     Urgency →
                 </div>
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase tracking-tighter text-slate-400 dark:text-slate-500 pointer-events-none select-none">
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase tracking-tighter text-slate-400 dark:text-slate-500 pointer-events-none select-none bg-white/50 dark:bg-slate-900/50 px-2 rounded-full backdrop-blur-sm z-10">
                     ↑ Importance
                 </div>
 
