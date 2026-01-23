@@ -163,11 +163,20 @@ function App() {
       // Double-check pause flag before actually syncing
       if (syncPausedRef.current) return
 
+      // 🚨 CRITICAL SAFEGUARD: Never sync empty arrays to cloud
+      // This prevents accidental data loss from race conditions
+      if (tasks.length === 0) {
+        console.warn('⚠️ Skipping sync: tasks array is empty. This prevents data loss.')
+        return
+      }
+
       try {
         const user = session.user
 
+        // Create backup before syncing
+        localStorage.setItem('eisenpower-tasks-backup', JSON.stringify(tasks))
+
         // Upsert: Insert if not exists, update if exists
-        // Requires a unique constraint on user_id in Supabase (or use onConflict)
         const { error } = await supabase
           .from('user_data')
           .upsert(
@@ -181,7 +190,7 @@ function App() {
       } catch (err) {
         console.error('Error syncing to cloud:', err)
       }
-    }, 1000) // Reduced to 1 second for faster cross-device sync
+    }, 1000)
 
     return () => clearTimeout(timer)
   }, [tasks, session])
