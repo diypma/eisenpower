@@ -233,11 +233,16 @@ function App() {
       // Double-check pause flag before actually syncing
       if (syncPausedRef.current) return
 
-      // 🚨 CRITICAL SAFEGUARD: Never sync empty arrays to cloud
-      // This prevents accidental data loss from race conditions
-      if (tasks.length === 0) {
-        console.warn('⚠️ Skipping sync: tasks array is empty. This prevents data loss.')
-        return
+      // 🚨 REFINED SAFEGUARD: Only block empty syncs if this looks like a race condition
+      // Allow legitimate "user deleted everything" syncs
+      if (tasks.length === 0 && deletedTasks.length === 0) {
+        const hasEverSynced = localStorage.getItem('eisenpower-has-synced')
+        if (!hasEverSynced) {
+          console.log('⏭️ Skipping first sync with empty data (waiting for local data to load)')
+          return
+        }
+        // If we've synced before, this is likely a legitimate "delete all" action
+        console.log('✅ Syncing empty state (user deleted all tasks)')
       }
 
       try {
@@ -260,6 +265,10 @@ function App() {
 
         if (error) {
           console.error('Supabase sync error:', error)
+        } else {
+          // Mark that we've successfully synced at least once
+          localStorage.setItem('eisenpower-has-synced', 'true')
+          console.log(`📤 Synced to cloud: ${tasks.length} tasks, ${deletedTasks.length} deleted`)
         }
       } catch (err) {
         console.error('Error syncing to cloud:', err)
