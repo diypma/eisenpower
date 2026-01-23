@@ -77,6 +77,9 @@ function App() {
   // CLOUD SYNC
   // ==========================================================================
 
+  // Flag to pause sync when receiving realtime updates (prevents race condition)
+  const syncPausedRef = useRef(false)
+
   /** Initialize Auth Listener */
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -153,7 +156,13 @@ function App() {
   useEffect(() => {
     if (!session) return
 
+    // Skip sync if we just received a realtime update
+    if (syncPausedRef.current) return
+
     const timer = setTimeout(async () => {
+      // Double-check pause flag before actually syncing
+      if (syncPausedRef.current) return
+
       try {
         const user = session.user
 
@@ -193,7 +202,11 @@ function App() {
         },
         () => {
           // When a change is detected (likely from another device), refresh data
+          // Pause local sync to prevent overwriting with stale data
+          syncPausedRef.current = true
           loadCloudData()
+          // Resume sync after debounce period has passed
+          setTimeout(() => { syncPausedRef.current = false }, 1500)
         }
       )
       .subscribe()
