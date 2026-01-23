@@ -103,8 +103,12 @@ function App() {
   // CLOUD SYNC
   // ==========================================================================
 
-  // Flag to pause sync when receiving realtime updates (prevents race condition)
-  const syncPausedRef = useRef(false)
+  // Tracking refs to ensure sync logic always uses the latest state (prevents stale closures)
+  const tasksRef = useRef(tasks)
+  const deletedTasksRef = useRef(deletedTasks)
+
+  useEffect(() => { tasksRef.current = tasks }, [tasks])
+  useEffect(() => { deletedTasksRef.current = deletedTasks }, [deletedTasks])
 
   /** Initialize Auth Listener */
   useEffect(() => {
@@ -143,60 +147,58 @@ function App() {
         .maybeSingle()
 
       if (error) {
-        console.error('Supabase read error:', error)
+        console.error('❌ Supabase read error:', error)
         return
       }
 
-      // 1. First, merge Deleted Tasks (Recycle Bin) to create a definitive deletion set
+      const cloudTasks = (data && data.tasks) ? data.tasks : []
       const cloudDeleted = (data && data.deleted_tasks) ? data.deleted_tasks : []
-      const localDeleted = deletedTasks // Use current state for local deleted tasks
-      
-      const deletedMap = new Map()
-      // Union of both deleted lists, taking newest version if duplicates
-      const allDeleted = [...localDeleted, ...cloudDeleted]
-      allDeleted.forEach(t => {
-        const existing = deletedMap.get(t.id)
-        const currentVersion = (t.updatedAt || t.id)
-        const existingVersion = existing ? (existing.updatedAt || existing.id) : -1
-        if (currentVersion >= existingVersion) {
-          deletedMap.set(t.id, t)
-        }
-      })
-      const mergedDeleted = Array.from(deletedMap.values())
-      setDeletedTasks(mergedDeleted)
 
-      // 2. Merge Main Tasks using the merged deletion set
-      setTasks(currentLocalTasks => {
-        const cloudTasks = (data && data.tasks) ? data.tasks : []
-        const localMap = new Map(currentLocalTasks.map(t => [t.id, t]))
-        const cloudMap = new Map(cloudTasks.map(t => [t.id, t]))
-        const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
-        const merged = []
-
-        allIds.forEach(id => {
-          const local = localMap.get(id)
-          const cloud = cloudMap.get(id)
-
-          if (local && cloud) {
-            const localTime = local.updatedAt || local.id
-            const cloudTime = cloud.updatedAt || cloud.id
-            merged.push(localTime >= cloudTime ? local : cloud)
-          } else if (cloud) {
-            // Only in cloud: Check if we deleted it locally
-            if (!deletedMap.has(id)) {
-              merged.push(cloud)
-            }
-          } else if (local) {
-            // Only in local: Check if it was deleted elsewhere
-            if (!deletedMap.has(id)) {
-              merged.push(local)
-            }
+      // 1. Merge Recycle Bin (Deleted Tasks)
+      setDeletedTasks(prevLocalDeleted => {
+        const deletedMap = new Map()
+        // Union of both, taking newest version (LWW)
+        const allDeleted = [...prevLocalDeleted, ...cloudDeleted]
+        allDeleted.forEach(t => {
+          const existing = deletedMap.get(t.id)
+          const currentVersion = (t.updatedAt || t.id)
+          const existingVersion = existing ? (existing.updatedAt || existing.id) : -1
+          if (currentVersion >= existingVersion) {
+            deletedMap.set(t.id, t)
           }
         })
-        return merged
+        const mergedDeleted = Array.from(deletedMap.values())
+        
+        // 2. Merge Main Tasks using the NEWLY calculated mergedDeleted
+        setTasks(currentLocalTasks => {
+          const localMap = new Map(currentLocalTasks.map(t => [t.id, t]))
+          const cloudMap = new Map(cloudTasks.map(t => [t.id, t]))
+          const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
+          const deletedMapForTasks = new Map(mergedDeleted.map(t => [t.id, t]))
+          const merged = []
+
+          allIds.forEach(id => {
+            const local = localMap.get(id)
+            const cloud = cloudMap.get(id)
+
+            if (local && cloud) {
+              const localTime = local.updatedAt || local.id
+              const cloudTime = cloud.updatedAt || cloud.id
+              merged.push(localTime >= cloudTime ? local : cloud)
+            } else if (cloud) {
+              if (!deletedMapForTasks.has(id)) merged.push(cloud)
+            } else if (local) {
+              if (!deletedMapForTasks.has(id)) merged.push(local)
+            }
+          })
+          return merged
+        })
+
+        return mergedDeleted
       })
+      console.log('🔄 Cloud data merged successfully')
     } catch (err) {
-      console.error('Error loading cloud data:', err)
+      console.error('❌ Error loading cloud data:', err)
     }
   }
 
@@ -205,44 +207,36 @@ function App() {
     if (!session) return
 
     const timer = setTimeout(async () => {
-      // 🚨 Move pause check INSIDE timer to ensure we don't drop the latest change
-      if (syncPausedRef.current) return
-
-      // REFINED SAFEGUARD: Only block empty syncs if this looks like a race condition
+      // SAFEGUARD: Don't sync empty data on initial load if we've never synced before
       if (tasks.length === 0 && deletedTasks.length === 0) {
-        const hasEverSynced = localStorage.getItem('eisenpower-has-synced')
-        if (!hasEverSynced) {
-          console.log('⏭️ Skipping first sync with empty data')
-          return
-        }
-        console.log('✅ Syncing empty state')
+        if (!localStorage.getItem('eisenpower-has-synced')) return
       }
 
       try {
-        const user = session.user
         localStorage.setItem('eisenpower-tasks-backup', JSON.stringify(tasks))
 
         const { error } = await supabase
           .from('user_data')
           .upsert(
             {
-              user_id: user.id,
+              user_id: session.user.id,
               tasks: tasks,
-              deleted_tasks: deletedTasks
+              deleted_tasks: deletedTasks,
+              updated_at: new Date().toISOString()
             },
             { onConflict: 'user_id' }
           )
 
         if (error) {
-          console.error('Supabase sync error:', error)
+          console.error('❌ Sync error:', error)
         } else {
           localStorage.setItem('eisenpower-has-synced', 'true')
-          console.log(`📤 Synced to cloud: ${tasks.length} tasks, ${deletedTasks.length} deleted`)
+          console.log(`📤 Synced: ${tasks.length} tasks, ${deletedTasks.length} deleted`)
         }
       } catch (err) {
-        console.error('Error syncing to cloud:', err)
+        console.error('❌ Sync catch:', err)
       }
-    }, 500)
+    }, 1000) // Increased to 1s to reduce write frequency
 
     return () => clearTimeout(timer)
   }, [tasks, deletedTasks, session])
@@ -261,11 +255,9 @@ function App() {
           table: 'user_data',
           filter: `user_id=eq.${session.user.id}`
         },
-        () => {
-          syncPausedRef.current = true
+        (payload) => {
+          console.log('☁️ Remote change detected:', payload.eventType)
           loadCloudData()
-          // Shortened pause to 500ms so user actions aren't locked out for long
-          setTimeout(() => { syncPausedRef.current = false }, 500)
         }
       )
       .subscribe()
