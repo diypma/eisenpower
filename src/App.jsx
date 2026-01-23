@@ -13,8 +13,10 @@
  * - Zoom controls for dense task layouts
  * 
  * 🚀 AI AGENT INSTRUCTION:
- * When pushing a significant update or fixing a bug, YOU MUST increment the "version" 
- * in 'package.json'. This version is displayed in the UI header.
+ * When pushing a significant update or fixing a bug, YOU MUST:
+ * 1. Increment the "version" in 'package.json'.
+ * 2. Commit and Push the changes to trigger the GitHub Actions deployment.
+ * The version in the UI header automatically reflects 'package.json'.
  */
 
 import pkg from '../package.json'
@@ -128,7 +130,7 @@ function App() {
 
   /**
    * Load tasks from Supabase
-   * Merge strategy: localStorage is master, cloud fills gaps.
+   * Merge strategy: Last-Write-Wins (LWW) using updatedAt timestamp.
    */
   const loadCloudData = async () => {
     if (!session) return
@@ -136,7 +138,7 @@ function App() {
     try {
       const { data, error } = await supabase
         .from('user_data')
-        .select('tasks')
+        .select('tasks, deleted_tasks')
         .eq('user_id', session.user.id)
         .maybeSingle()
 
@@ -145,31 +147,69 @@ function App() {
         return
       }
 
-      if (data && data.tasks) {
-        setTasks(currentLocalTasks => {
-          const cloudTasks = data.tasks
-          const now = Date.now()
-          const fiveMinutesAgo = now - (5 * 60 * 1000)
+      if (data) {
+        const now = Date.now()
+        const fiveMinutesAgo = now - (5 * 60 * 1000)
 
-          // Strategy: Cloud is the master source of truth for existing data.
-          // Start with cloud tasks.
-          const combined = [...cloudTasks]
+        // 1. Merge Main Tasks
+        if (data.tasks) {
+          setTasks(currentLocalTasks => {
+            const cloudTasks = data.tasks
+            const localMap = new Map(currentLocalTasks.map(t => [t.id, t]))
+            const cloudMap = new Map(cloudTasks.map(t => [t.id, t]))
+            const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
+            const merged = []
 
-          // Only keep local tasks that are NOT in the cloud IF they were created very recently.
-          // This handles tasks created during a temporary offline dip.
-          // If a task is old and missing from cloud, it was likely deleted on another device.
-          currentLocalTasks.forEach(localTask => {
-            const inCloud = cloudTasks.find(ct => ct.id === localTask.id)
-            if (!inCloud) {
-              const isRecent = localTask.id > fiveMinutesAgo
-              if (isRecent) {
-                combined.push(localTask)
+            allIds.forEach(id => {
+              const local = localMap.get(id)
+              const cloud = cloudMap.get(id)
+
+              if (local && cloud) {
+                // Compare timestamps (fallback to ID which is a timestamp)
+                const localTime = local.updatedAt || local.id
+                const cloudTime = cloud.updatedAt || cloud.id
+                merged.push(localTime >= cloudTime ? local : cloud)
+              } else if (cloud) {
+                merged.push(cloud)
+              } else if (local) {
+                // Local only - keep if very new (offline creation)
+                if (local.id > fiveMinutesAgo) {
+                  merged.push(local)
+                }
+                // If old and not in cloud, it was likely deleted elsewhere
               }
-            }
+            })
+            return merged
           })
+        }
 
-          return combined
-        })
+        // 2. Merge Deleted Tasks (Recycle Bin)
+        if (data.deleted_tasks) {
+          setDeletedTasks(currentLocalDeleted => {
+            const cloudDeleted = data.deleted_tasks
+            const localMap = new Map(currentLocalDeleted.map(t => [t.id, t]))
+            const cloudMap = new Map(cloudDeleted.map(t => [t.id, t]))
+            const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
+            const merged = []
+
+            allIds.forEach(id => {
+              const local = localMap.get(id)
+              const cloud = cloudMap.get(id)
+
+              if (local && cloud) {
+                const localTime = local.updatedAt || local.id
+                const cloudTime = cloud.updatedAt || cloud.id
+                merged.push(localTime >= cloudTime ? local : cloud)
+              } else if (cloud) {
+                merged.push(cloud)
+              } else if (local) {
+                // Keep local deleted if it hasn't been merged to cloud yet
+                merged.push(local)
+              }
+            })
+            return merged
+          })
+        }
       }
     } catch (err) {
       console.error('Error loading cloud data:', err)
@@ -308,12 +348,14 @@ function App() {
 
   /** Create a new task from the modal form data */
   const handleCreateTask = ({ text, subtasks }) => {
+    const now = Date.now()
     const newTask = {
-      id: Date.now(),
+      id: now,
       text,
       x: modalState.x,
       y: modalState.y,
-      subtasks: subtasks.map((s, i) => ({ ...s, id: Date.now() + i }))
+      subtasks: subtasks.map((s, i) => ({ ...s, id: now + 1 + i })),
+      updatedAt: now
     }
     setTasks([...tasks, newTask])
     setModalState({ ...modalState, isOpen: false })
@@ -322,16 +364,21 @@ function App() {
   /** Move a task to a new position on the grid */
   const moveTask = (id, x, y) => {
     setTasks(prev => prev.map(task =>
-      task.id === id ? { ...task, x, y } : task
+      task.id === id ? { ...task, x, y, updatedAt: Date.now() } : task
     ))
   }
 
   /** Delete a task by ID (moves to recycle bin) */
   const deleteTask = (id) => {
+    const now = Date.now()
     const taskToDelete = tasks.find(t => t.id === id)
     if (taskToDelete) {
       // Move to recycle bin with timestamp
-      setDeletedTasks(prev => [...prev, { ...taskToDelete, deletedAt: new Date().toISOString() }])
+      setDeletedTasks(prev => [...prev, {
+        ...taskToDelete,
+        deletedAt: new Date().toISOString(),
+        updatedAt: now
+      }])
     }
     setTasks(prev => prev.filter(t => t.id !== id))
     if (expandedTaskId === id) setExpandedTaskId(null)
@@ -343,7 +390,7 @@ function App() {
     if (taskToRestore) {
       // Remove deletedAt timestamp and add back to tasks
       const { deletedAt, ...restoredTask } = taskToRestore
-      setTasks(prev => [...prev, restoredTask])
+      setTasks(prev => [...prev, { ...restoredTask, updatedAt: Date.now() }])
       setDeletedTasks(prev => prev.filter(t => t.id !== id))
     }
   }
@@ -359,6 +406,7 @@ function App() {
       if (task.id === taskId) {
         return {
           ...task,
+          updatedAt: Date.now(),
           subtasks: task.subtasks.map(s => {
             if (s.id === subtaskId) {
               const newCompleted = !s.completed
@@ -383,7 +431,8 @@ function App() {
         return {
           ...task,
           completed: true,
-          completedAt: new Date().toISOString()
+          completedAt: new Date().toISOString(),
+          updatedAt: Date.now()
         }
       }
       return task
@@ -394,7 +443,7 @@ function App() {
   /** Edit task title */
   const editTask = (taskId, newText) => {
     setTasks(prev => prev.map(task =>
-      task.id === taskId ? { ...task, text: newText } : task
+      task.id === taskId ? { ...task, text: newText, updatedAt: Date.now() } : task
     ))
   }
 
@@ -404,6 +453,7 @@ function App() {
       if (task.id === taskId) {
         return {
           ...task,
+          updatedAt: Date.now(),
           subtasks: task.subtasks.map(s =>
             s.id === subtaskId ? { ...s, text: newText } : s
           )
@@ -429,6 +479,7 @@ function App() {
         if (t.id === data.taskId) {
           return {
             ...t,
+            updatedAt: Date.now(),
             subtasks: t.subtasks.map(s =>
               s.id === data.subtaskId ? { ...s, x, y } : s
             )
@@ -446,6 +497,7 @@ function App() {
       if (t.id === parentId) {
         return {
           ...t,
+          updatedAt: Date.now(),
           subtasks: t.subtasks.map(s =>
             s.id === subtaskId ? { ...s, x: undefined, y: undefined } : s
           )
@@ -528,6 +580,7 @@ function App() {
                           if (t.id === task.id) {
                             return {
                               ...t,
+                              updatedAt: Date.now(),
                               subtasks: t.subtasks.map(s =>
                                 s.id === id ? { ...s, x, y } : s
                               )
@@ -541,6 +594,7 @@ function App() {
                           if (t.id === task.id) {
                             return {
                               ...t,
+                              updatedAt: Date.now(),
                               subtasks: t.subtasks.map(s =>
                                 s.id === id ? { ...s, x: undefined, y: undefined } : s
                               )
@@ -622,6 +676,7 @@ function App() {
             if (task.id === taskId) {
               return {
                 ...task,
+                updatedAt: Date.now(),
                 subtasks: [...(task.subtasks || []), { id: Date.now(), text, completed: false }]
               }
             }

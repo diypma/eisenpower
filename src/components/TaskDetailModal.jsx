@@ -24,6 +24,8 @@ export default function TaskDetailModal({
     onComplete,
     onSubtaskDragStart,
     onAddSubtask,
+    onEditTask,
+    onEditSubtask,
     onDrop,
     gridRef
 }) {
@@ -37,6 +39,16 @@ export default function TaskDetailModal({
     const [editedTaskTitle, setEditedTaskTitle] = useState('')
     const [editingSubtaskId, setEditingSubtaskId] = useState(null)
     const [editedSubtaskText, setEditedSubtaskText] = useState('')
+
+    /** Reset state when task changes */
+    useEffect(() => {
+        setEditingTaskTitle(false)
+        setEditedTaskTitle('')
+        setIsAdding(false)
+        setNewSubtaskText('')
+        setEditingSubtaskId(null)
+        setEditedSubtaskText('')
+    }, [task?.id, isOpen])
 
     // ==========================================================================
     // EVENT HANDLERS

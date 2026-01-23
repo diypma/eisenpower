@@ -52,6 +52,12 @@ body {
   /* Allow scrolling, override on draggables */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Microsoft Edge / Mobile Optimizations */
+  overscroll-behavior-y: none;
+  /* Prevent "rubber-banding" scroll bounce */
+  -webkit-tap-highlight-color: transparent;
+  /* Remove gray box on touch tap */
 }
 
 /* ==========================================================================
@@ -68,6 +74,16 @@ body {
    CUSTOM SCROLLBAR
    Styled scrollbar for better aesthetics in panels
    ========================================================================== */
+.custom-scrollbar {
+  /* Standards-based scrollbar for Firefox/Edge */
+  scrollbar-width: thin;
+  scrollbar-color: #e2e8f0 transparent;
+}
+
+.dark .custom-scrollbar {
+  scrollbar-color: #334155 transparent;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }

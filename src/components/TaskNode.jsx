@@ -286,9 +286,8 @@ export default function TaskNode({
                     />
                 )}
 
-                {/* Task Text */}
-                <div className="flex items-start justify-between gap-2">
-                    <span className={`leading-tight ${isSubtaskNode ? 'text-xs' : ''}`}>{task.text}</span>
+                <div className="flex items-start justify-between gap-2 overflow-hidden">
+                    <span className={`leading-tight break-words line-clamp-4 ${isSubtaskNode ? 'text-xs' : ''}`}>{task.text}</span>
                 </div>
 
                 {/* Footer: Priority Score & Subtask Count */}
