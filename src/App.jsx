@@ -29,6 +29,7 @@ import TaskModal from './components/TaskModal'
 import TaskDetailModal from './components/TaskDetailModal'
 import SettingsMenu from './components/SettingsMenu'
 import { getTaskAccentColor } from './utils/colorUtils'
+import { supabase } from './lib/supabase'
 
 function App() {
   // ==========================================================================
@@ -87,12 +88,202 @@ function App() {
     }
   })
 
-  /**
-   * Theme state - 'light' or 'dark', persisted to localStorage
-   */
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('eisenpower-theme') || 'light'
   })
+
+  // Supabase Session State
+  const [session, setSession] = useState(null)
+
+  // ==========================================================================
+  // CLOUD SYNC v2.0 (Conflict-Resistant)
+  // ==========================================================================
+
+  // Tracking refs to ensure sync logic always uses the latest state
+  const tasksRef = useRef(tasks)
+  const deletedTasksRef = useRef(deletedTasks)
+  const lastConvergedHashRef = useRef(null) // Tracks the state of the last known-good sync
+  const syncInProgressRef = useRef(false) // Prevents concurrent uploads
+
+  useEffect(() => { tasksRef.current = tasks }, [tasks])
+  useEffect(() => { deletedTasksRef.current = deletedTasks }, [deletedTasks])
+
+  /** Initialize Auth Listener */
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  /** Load data from cloud on login */
+  useEffect(() => {
+    if (session) {
+      loadCloudData()
+    }
+  }, [session])
+
+  /**
+   * loadCloudData - Robust 3-Way Merge
+   * Merges local state with cloud state using per-item timestamps (LWW).
+   */
+  const loadCloudData = async () => {
+    if (!session) return
+
+    try {
+      const { data, error } = await supabase
+        .from('user_data')
+        .select('tasks, deleted_tasks')
+        .eq('user_id', session.user.id)
+        .maybeSingle()
+
+      if (error) {
+        console.error('❌ Supabase read error:', error)
+        return
+      }
+
+      const cloudTasks = (data && data.tasks) ? data.tasks : []
+      const cloudDeleted = (data && data.deleted_tasks) ? data.deleted_tasks : []
+
+      // 1. Calculate merged Deleted Tasks (LWW)
+      const deletedMap = new Map()
+      const allDeleted = [...deletedTasksRef.current, ...cloudDeleted]
+      allDeleted.forEach(t => {
+        const existing = deletedMap.get(t.id)
+        const currentVer = t.updatedAt || t.id
+        const existingVer = existing ? (existing.updatedAt || existing.id) : -1
+        if (currentVer >= existingVer) {
+          deletedMap.set(t.id, t)
+        }
+      })
+      const finalDeleted = Array.from(deletedMap.values())
+
+      // 2. Calculate merged Main Tasks (LWW)
+      const localMap = new Map(tasksRef.current.map(t => [t.id, t]))
+      const cloudMap = new Map(cloudTasks.map(t => [t.id, t]))
+      const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
+      const finalDeletedMap = new Map(finalDeleted.map(t => [t.id, t]))
+      const finalTasks = []
+
+      allIds.forEach(id => {
+        const local = localMap.get(id)
+        const cloud = cloudMap.get(id)
+
+        if (local && cloud) {
+          const localVer = local.updatedAt || local.id
+          const cloudVer = cloud.updatedAt || cloud.id
+          finalTasks.push(localVer >= cloudVer ? local : cloud)
+        } else if (cloud) {
+          // Keep from cloud only if not in finalDeleted
+          if (!finalDeletedMap.has(id)) finalTasks.push(cloud)
+        } else if (local) {
+          // Keep from local only if not in finalDeleted
+          if (!finalDeletedMap.has(id)) finalTasks.push(local)
+        }
+      })
+
+      // Update state & Convergence Tracker
+      setDeletedTasks(finalDeleted)
+      setTasks(finalTasks)
+
+      const convergedData = { tasks: finalTasks, deleted_tasks: finalDeleted }
+      lastConvergedHashRef.current = JSON.stringify(convergedData)
+
+      console.log('🔄 Cloud sync v2.0: Convergence reached')
+    } catch (err) {
+      console.error('❌ Merge error:', err)
+    }
+  }
+
+  /** Debounced Sync Upload Hook with Feedback Suppression */
+  useEffect(() => {
+    if (!session) return
+
+    const timer = setTimeout(async () => {
+      if (syncInProgressRef.current) return
+
+      // CHECK: Do we actually have unsaved changes compared to last convergence?
+      const localData = { tasks, deleted_tasks: deletedTasks }
+      const localHash = JSON.stringify(localData)
+
+      if (localHash === lastConvergedHashRef.current) {
+        // console.log('✅ No unsaved changes (feedback loop suppressed)')
+        return
+      }
+
+      // SAFEGUARD: Don't sync completely empty data on initial load if we've never synced
+      if (tasks.length === 0 && deletedTasks.length === 0) {
+        if (!localStorage.getItem('eisenpower-has-synced')) return
+      }
+
+      try {
+        syncInProgressRef.current = true
+        localStorage.setItem('eisenpower-tasks-backup', JSON.stringify(tasks))
+
+        const { error } = await supabase
+          .from('user_data')
+          .upsert(
+            {
+              user_id: session.user.id,
+              tasks: tasks,
+              deleted_tasks: deletedTasks
+            },
+            { onConflict: 'user_id' }
+          )
+
+        if (error) {
+          console.error('❌ Sync error:', error)
+        } else {
+          lastConvergedHashRef.current = localHash
+          localStorage.setItem('eisenpower-has-synced', 'true')
+          console.log(`📤 Synced: ${tasks.length} tasks to cloud`)
+        }
+      } catch (err) {
+        console.error('❌ Sync catch:', err)
+      } finally {
+        syncInProgressRef.current = false
+      }
+    }, 1500)
+
+    return () => clearTimeout(timer)
+  }, [tasks, deletedTasks, session])
+
+  /** Non-blocking Realtime Listener */
+  useEffect(() => {
+    if (!session) return
+
+    const channel = supabase
+      .channel(`user-sync-${session.user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_data',
+          filter: `user_id=eq.${session.user.id}`
+        },
+        (payload) => {
+          console.log('☁️ Realtime: Remote change detected')
+          loadCloudData()
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Realtime: Subscribed to cloud updates')
+        }
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [session])
 
   // ==========================================================================
   // PERSISTENCE EFFECTS
