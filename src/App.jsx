@@ -115,14 +115,23 @@ function App() {
       if (data && data.tasks) {
         setTasks(currentLocalTasks => {
           const cloudTasks = data.tasks
+          const now = Date.now()
+          const fiveMinutesAgo = now - (5 * 60 * 1000)
 
-          // Strategy: localStorage is the master source of truth.
-          // Keep local tasks, add new cloud tasks we don't have.
-          const combined = [...currentLocalTasks]
+          // Strategy: Cloud is the master source of truth for existing data.
+          // Start with cloud tasks.
+          const combined = [...cloudTasks]
 
-          cloudTasks.forEach(cloudTask => {
-            if (!currentLocalTasks.find(lt => lt.id === cloudTask.id)) {
-              combined.push(cloudTask)
+          // Only keep local tasks that are NOT in the cloud IF they were created very recently.
+          // This handles tasks created during a temporary offline dip.
+          // If a task is old and missing from cloud, it was likely deleted on another device.
+          currentLocalTasks.forEach(localTask => {
+            const inCloud = cloudTasks.find(ct => ct.id === localTask.id)
+            if (!inCloud) {
+              const isRecent = localTask.id > fiveMinutesAgo
+              if (isRecent) {
+                combined.push(localTask)
+              }
             }
           })
 
