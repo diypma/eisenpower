@@ -352,11 +352,11 @@ function App() {
         const diffDays = Math.ceil((panicDate - today) / (1000 * 60 * 60 * 24));
 
         if (diffDays <= windowSize) {
-          // Calculate ramped urgency (capped at 98% to leave edge room)
-          let targetX = 98;
+          // Calculate ramped urgency (capped at 94% to leave edge room)
+          let targetX = 94;
           if (diffDays > 0) {
             const progress = (windowSize - diffDays) / windowSize;
-            targetX = task.x + (98 - task.x) * progress;
+            targetX = task.x + (94 - task.x) * progress;
           }
 
           // Only update if it's a significant forward shift
