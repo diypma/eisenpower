@@ -172,10 +172,36 @@ function App() {
       } catch (err) {
         console.error('Error syncing to cloud:', err)
       }
-    }, 2000) // 2 second debounce
+    }, 1000) // Reduced to 1 second for faster cross-device sync
 
     return () => clearTimeout(timer)
   }, [tasks, session])
+
+  /** Real-time subscription to listen for changes from other devices */
+  useEffect(() => {
+    if (!session) return
+
+    const channel = supabase
+      .channel(`user-sync-${session.user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_data',
+          filter: `user_id=eq.${session.user.id}`
+        },
+        () => {
+          // When a change is detected (likely from another device), refresh data
+          loadCloudData()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [session])
 
   // Modal and UI state
   const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
