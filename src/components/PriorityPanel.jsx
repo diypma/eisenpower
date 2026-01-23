@@ -138,7 +138,10 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
                                 onClick={() => onExpandTask(task.id)}
                             >
                                 {/* Rank Number */}
-                                <span className="font-black text-slate-200 dark:text-slate-700 text-2xl tabular-nums leading-none pt-1 group-hover:text-indigo-100 dark:group-hover:text-indigo-900 transition-colors">
+                                <span
+                                    className="font-black text-2xl tabular-nums leading-none pt-1 transition-colors"
+                                    style={{ color: getScoreColor(score).textLight }}
+                                >
                                     {String(displayIndex).padStart(2, '0')}
                                 </span>
 

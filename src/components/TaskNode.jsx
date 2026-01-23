@@ -13,7 +13,7 @@
  */
 
 import { useRef, useState, useEffect } from 'react'
-import { getTaskAccentColor } from '../utils/colorUtils'
+import { getTaskAccentColor, getScoreColor } from '../utils/colorUtils'
 
 // ==========================================================================
 // HELPER FUNCTIONS
@@ -21,16 +21,16 @@ import { getTaskAccentColor } from '../utils/colorUtils'
 
 /**
  * Get gradient color class based on priority score
- * Higher scores = warmer/more urgent colors
+ * Traffic light system: High = Green (inviting), Low = Red (less engaging)
  * @param {number} score - Priority score (0-100)
  * @returns {string} Tailwind gradient classes
  */
 function getPriorityColor(score) {
-    if (score >= 80) return 'from-red-400 to-orange-400'
-    if (score >= 60) return 'from-orange-400 to-amber-400'
-    if (score >= 40) return 'from-amber-400 to-yellow-400'
-    if (score >= 20) return 'from-blue-400 to-indigo-400'
-    return 'from-slate-300 to-slate-400'
+    if (score >= 80) return 'from-emerald-400 to-green-400'     // High priority - inviting green
+    if (score >= 60) return 'from-green-400 to-lime-400'        // Good priority - lime green
+    if (score >= 40) return 'from-amber-400 to-yellow-400'      // Medium priority - amber
+    if (score >= 20) return 'from-orange-400 to-amber-400'      // Lower priority - orange
+    return 'from-red-400 to-orange-400'                          // Lowest priority - red
 }
 
 // ==========================================================================
