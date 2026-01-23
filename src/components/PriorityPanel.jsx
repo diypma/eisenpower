@@ -13,6 +13,7 @@
  */
 
 import { useState } from 'react'
+import { getScoreColor } from '../utils/colorUtils'
 
 export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, onCompleteTask }) {
     // ==========================================================================
@@ -108,7 +109,10 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
                                             {item.text}
                                         </p>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <p className="text-[10px] font-black uppercase tracking-tighter text-indigo-400 dark:text-indigo-500">
+                                            <p
+                                                className="text-[10px] font-black uppercase tracking-tighter"
+                                                style={{ color: getScoreColor(score).textLight }}
+                                            >
                                                 Score: {score.toFixed(0)}
                                             </p>
                                             <div className="w-1 h-1 rounded-full bg-slate-200 dark:bg-slate-700" />
@@ -142,9 +146,11 @@ export default function PriorityPanel({ tasks, onToggleSubtask, onExpandTask, on
                                     {/* Task Title */}
                                     <p className="font-bold text-slate-800 dark:text-slate-200 leading-tight truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{task.text}</p>
 
-                                    {/* Task Metadata */}
                                     <div className="flex items-center gap-2 mt-1">
-                                        <p className="text-[10px] font-black uppercase tracking-tighter text-slate-400 dark:text-slate-500">
+                                        <p
+                                            className="text-[10px] font-black uppercase tracking-tighter"
+                                            style={{ color: getScoreColor(score).textLight }}
+                                        >
                                             Score: {score.toFixed(0)}
                                         </p>
                                         <div className="w-1 h-1 rounded-full bg-slate-200 dark:bg-slate-700" />

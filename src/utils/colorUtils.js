@@ -29,3 +29,41 @@ export function getTaskAccentColor(taskId) {
         glow: `hsl(${hue}, 70%, 55%, 0.3)`    // Semi-transparent for ring effects
     }
 }
+
+/**
+ * Generate a traffic-light style color based on priority score
+ * 
+ * Creates a smooth gradient from red (low priority) through amber (medium)
+ * to green (high priority). Uses HSL for smooth transitions.
+ * 
+ * Score ranges:
+ * - 0-30:  Red/Coral (less engaging, less urgent)
+ * - 30-60: Amber/Yellow (moderate attention)
+ * - 60-100: Green/Emerald (inviting, high priority)
+ * 
+ * @param {number} score - Priority score (0-100)
+ * @returns {Object} Color palette for the score
+ */
+export function getScoreColor(score) {
+    // Clamp score to 0-100
+    const s = Math.max(0, Math.min(100, score))
+
+    // Map score to hue: 0 (red) -> 60 (yellow) -> 120 (green)
+    // We use a slightly modified range for more pleasing colors
+    // Low score (0) = hue 0 (red)
+    // High score (100) = hue 145 (emerald green)
+    const hue = (s / 100) * 145
+
+    // Saturation: higher scores are more vibrant
+    const saturation = 60 + (s / 100) * 20  // 60-80%
+
+    // Lightness: keep consistent for readability
+    const lightness = 45
+
+    return {
+        text: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+        textLight: `hsl(${hue}, ${saturation}%, 55%)`,
+        bg: `hsl(${hue}, ${saturation}%, 95%)`,
+        bgDark: `hsl(${hue}, ${saturation - 10}%, 20%)`
+    }
+}
