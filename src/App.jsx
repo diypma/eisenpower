@@ -147,70 +147,76 @@ function App() {
         return
       }
 
-      if (data) {
-        const now = Date.now()
-        const fiveMinutesAgo = now - (5 * 60 * 1000)
+      const now = Date.now()
+      const fiveMinutesAgo = now - (5 * 60 * 1000)
 
-        // 1. Merge Main Tasks
-        if (data.tasks) {
-          setTasks(currentLocalTasks => {
-            const cloudTasks = data.tasks
-            const localMap = new Map(currentLocalTasks.map(t => [t.id, t]))
-            const cloudMap = new Map(cloudTasks.map(t => [t.id, t]))
-            const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
-            const merged = []
+      // 1. Merge Main Tasks
+      setTasks(currentLocalTasks => {
+        const cloudTasks = (data && data.tasks) ? data.tasks : []
+        const hasCloudRow = !!data
 
-            allIds.forEach(id => {
-              const local = localMap.get(id)
-              const cloud = cloudMap.get(id)
+        // If no cloud and no local, nothing to do
+        if (!hasCloudRow && currentLocalTasks.length === 0) return []
 
-              if (local && cloud) {
-                // Compare timestamps (fallback to ID which is a timestamp)
-                const localTime = local.updatedAt || local.id
-                const cloudTime = cloud.updatedAt || cloud.id
-                merged.push(localTime >= cloudTime ? local : cloud)
-              } else if (cloud) {
-                merged.push(cloud)
-              } else if (local) {
-                // Local only - keep if very new (offline creation)
-                if (local.id > fiveMinutesAgo) {
-                  merged.push(local)
-                }
-                // If old and not in cloud, it was likely deleted elsewhere
-              }
-            })
-            return merged
-          })
-        }
+        const localMap = new Map(currentLocalTasks.map(t => [t.id, t]))
+        const cloudMap = new Map(cloudTasks.map(t => [t.id, t]))
+        const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
+        const merged = []
 
-        // 2. Merge Deleted Tasks (Recycle Bin)
-        if (data.deleted_tasks) {
-          setDeletedTasks(currentLocalDeleted => {
-            const cloudDeleted = data.deleted_tasks
-            const localMap = new Map(currentLocalDeleted.map(t => [t.id, t]))
-            const cloudMap = new Map(cloudDeleted.map(t => [t.id, t]))
-            const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
-            const merged = []
+        allIds.forEach(id => {
+          const local = localMap.get(id)
+          const cloud = cloudMap.get(id)
 
-            allIds.forEach(id => {
-              const local = localMap.get(id)
-              const cloud = cloudMap.get(id)
+          if (local && cloud) {
+            // Compare timestamps (fallback to ID which is a timestamp)
+            const localTime = local.updatedAt || local.id
+            const cloudTime = cloud.updatedAt || cloud.id
+            merged.push(localTime >= cloudTime ? local : cloud)
+          } else if (cloud) {
+            merged.push(cloud)
+          } else if (local) {
+            // Local only:
+            // - If cloud row doesn't exist yet, local is master
+            // - If cloud row exists, but task missing:
+            //   - If recently created, keep it (offline creation)
+            //   - If old, assume it was deleted on another device
+            if (!hasCloudRow || local.id > fiveMinutesAgo) {
+              merged.push(local)
+            }
+          }
+        })
+        return merged
+      })
 
-              if (local && cloud) {
-                const localTime = local.updatedAt || local.id
-                const cloudTime = cloud.updatedAt || cloud.id
-                merged.push(localTime >= cloudTime ? local : cloud)
-              } else if (cloud) {
-                merged.push(cloud)
-              } else if (local) {
-                // Keep local deleted if it hasn't been merged to cloud yet
-                merged.push(local)
-              }
-            })
-            return merged
-          })
-        }
-      }
+      // 2. Merge Deleted Tasks (Recycle Bin)
+      setDeletedTasks(currentLocalDeleted => {
+        const cloudDeleted = (data && data.deleted_tasks) ? data.deleted_tasks : []
+        const hasCloudRow = !!data
+
+        if (!hasCloudRow && currentLocalDeleted.length === 0) return []
+
+        const localMap = new Map(currentLocalDeleted.map(t => [t.id, t]))
+        const cloudMap = new Map(cloudDeleted.map(t => [t.id, t]))
+        const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
+        const merged = []
+
+        allIds.forEach(id => {
+          const local = localMap.get(id)
+          const cloud = cloudMap.get(id)
+
+          if (local && cloud) {
+            const localTime = local.updatedAt || local.id
+            const cloudTime = cloud.updatedAt || cloud.id
+            merged.push(localTime >= cloudTime ? local : cloud)
+          } else if (cloud) {
+            merged.push(cloud)
+          } else if (local) {
+            // Keep local deleted if it hasn't been merged to cloud yet
+            merged.push(local)
+          }
+        })
+        return merged
+      })
     } catch (err) {
       console.error('Error loading cloud data:', err)
     }
