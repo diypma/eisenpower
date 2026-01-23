@@ -95,27 +95,31 @@ function App() {
 
   /**
    * Load tasks from Supabase
-   * Merge strategy: Combine Cloud and Local tasks. Unique by ID.
-   * Local tasks not in the cloud are uploaded (Ensures no data loss).
+   * Merge strategy: localStorage is master, cloud fills gaps.
    */
   const loadCloudData = async () => {
+    if (!session) return
+
     try {
       const { data, error } = await supabase
         .from('user_data')
         .select('tasks')
+        .eq('user_id', session.user.id)
         .maybeSingle()
 
-      if (error) throw error
+      if (error) {
+        console.error('Supabase read error:', error)
+        return
+      }
 
       if (data && data.tasks) {
         setTasks(currentLocalTasks => {
           const cloudTasks = data.tasks
 
           // Strategy: localStorage is the master source of truth.
-          // 1. Keep everything in our current local state (includes offline edits).
+          // Keep local tasks, add new cloud tasks we don't have.
           const combined = [...currentLocalTasks]
 
-          // 2. Only add tasks from the cloud that we DON'T have locally.
           cloudTasks.forEach(cloudTask => {
             if (!currentLocalTasks.find(lt => lt.id === cloudTask.id)) {
               combined.push(cloudTask)
@@ -130,7 +134,7 @@ function App() {
     }
   }
 
-  /** Sync to cloud on change (Debounced) */
+  /** Sync to cloud on change (Debounced, uses Upsert) */
   useEffect(() => {
     if (!session) return
 
@@ -138,22 +142,17 @@ function App() {
       try {
         const user = session.user
 
-        // Check if row exists
-        const { data: existingRow } = await supabase
+        // Upsert: Insert if not exists, update if exists
+        // Requires a unique constraint on user_id in Supabase (or use onConflict)
+        const { error } = await supabase
           .from('user_data')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle()
+          .upsert(
+            { user_id: user.id, tasks: tasks },
+            { onConflict: 'user_id' }
+          )
 
-        if (existingRow) {
-          await supabase
-            .from('user_data')
-            .update({ tasks: tasks })
-            .eq('id', existingRow.id)
-        } else {
-          await supabase
-            .from('user_data')
-            .insert({ user_id: user.id, tasks: tasks })
+        if (error) {
+          console.error('Supabase sync error:', error)
         }
       } catch (err) {
         console.error('Error syncing to cloud:', err)
