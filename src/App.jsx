@@ -10,7 +10,6 @@
  * - Dark/Light theme support
  * - Mobile-responsive tabbed interface
  * - LocalStorage Persistence
- * - Zoom controls for dense task layouts
  * 
  * 🚀 AI AGENT INSTRUCTION:
  * When pushing a significant update or fixing a bug, YOU MUST:
@@ -325,7 +324,6 @@ function App() {
   const [expandedTaskId, setExpandedTaskId] = useState(null)
   const [hoveredTaskFamily, setHoveredTaskFamily] = useState(null)
   const [activeTab, setActiveTab] = useState('matrix') // Mobile tab: 'matrix' | 'list'
-  const [zoom, setZoom] = useState(1) // Grid zoom level (0.2 - 2.0)
   const graphContainerRef = useRef(null)
 
   // ==========================================================================
@@ -538,8 +536,6 @@ function App() {
             <GraphPaper
               onAddTask={handleOpenModal}
               onDrop={handleSubtaskDrop}
-              zoom={zoom}
-              onZoomChange={setZoom}
             >
               {/* Main Tasks */}
               {tasks.filter(task => !task.completed).map(task => (

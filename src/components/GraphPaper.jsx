@@ -8,14 +8,13 @@
  * Features:
  * - Click anywhere to add a new task at that position
  * - Drag-and-drop support for subtask extraction
- * - Zoomable grid for dense task layouts
  * - Quadrant labels (Do First, Schedule, Delegate, Eliminate)
  * - Responsive design for mobile/desktop
  */
 
 import React, { useRef } from 'react'
 
-export default function GraphPaper({ onAddTask, onDrop, zoom = 1, onZoomChange, children }) {
+export default function GraphPaper({ onAddTask, onDrop, children }) {
     const containerRef = useRef(null)
 
     // ==========================================================================
@@ -97,60 +96,8 @@ export default function GraphPaper({ onAddTask, onDrop, zoom = 1, onZoomChange, 
 
         onAddTask(x, y)
     }
-
-    // ==========================================================================
-    // ZOOM CONTROLS
-    // ==========================================================================
-
-    // Count rendered tasks to decide if zoom controls should be shown
-    const taskCount = React.Children.count(children)
-
-    // Show zoom controls if: grid is busy (>5 tasks) OR user has zoomed (so they can reset)
-    const showZoomControls = onZoomChange && (taskCount > 5 || zoom !== 1)
-
-    // ==========================================================================
-    // RENDER
-    // ==========================================================================
-
     return (
         <div className="relative w-full h-full flex items-center justify-center">
-
-            {/* Zoom Controls - Appears when grid is busy */}
-            {showZoomControls && (
-                <div className="absolute bottom-4 left-4 z-50 flex flex-col gap-2 bg-white dark:bg-slate-800 p-1.5 rounded-xl shadow-lg border border-slate-100 dark:border-slate-700">
-                    {/* Zoom In Button */}
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onZoomChange(Math.min(2, zoom + 0.1)) }}
-                        className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors"
-                        title="Zoom In"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                        </svg>
-                    </button>
-
-                    {/* Zoom Reset Button (shows current %) */}
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onZoomChange(1) }}
-                        className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-500 transition-colors"
-                        title="Reset Zoom"
-                    >
-                        {(zoom * 100).toFixed(0)}%
-                    </button>
-
-                    {/* Zoom Out Button */}
-                    <button
-                        onClick={(e) => { e.stopPropagation(); onZoomChange(Math.max(0.2, zoom - 0.1)) }}
-                        className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors"
-                        title="Zoom Out"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
-                        </svg>
-                    </button>
-                </div>
-            )}
-
             {/* Main Grid Container */}
             <div
                 ref={containerRef}
@@ -163,11 +110,7 @@ export default function GraphPaper({ onAddTask, onDrop, zoom = 1, onZoomChange, 
                     backgroundImage: `radial-gradient(circle, var(--grid-dot-color, #e2e8f0) 1px, transparent 1px)`,
                     backgroundSize: '24px 24px',
                     backgroundPosition: 'center center',
-                    backgroundColor: 'transparent',
-                    // Zoom transform
-                    transform: `scale(${zoom})`,
-                    transformOrigin: 'center center',
-                    transition: 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+                    backgroundColor: 'transparent'
                 }}
             >
                 {/* Axis Lines */}
