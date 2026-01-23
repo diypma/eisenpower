@@ -677,6 +677,8 @@ function App() {
         onSubtaskDragStart={(taskId, subtask) => {
           // Tracking hook for animations (currently unused)
         }}
+        onDrop={handleSubtaskDrop}
+        gridRef={graphContainerRef}
       />
     </div>
   )
