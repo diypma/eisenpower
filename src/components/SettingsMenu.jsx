@@ -13,7 +13,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
-export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, deletedTasks = [], onRestoreTask, onPermanentlyDelete }) {
+export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, session, deletedTasks = [], onRestoreTask, onPermanentlyDelete }) {
     // ==========================================================================
     // STATE & REFS
     // ==========================================================================

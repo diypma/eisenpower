@@ -521,6 +521,7 @@ function App() {
             setTasks={setTasks}
             isDark={theme === 'dark'}
             onToggleTheme={toggleTheme}
+            session={session}
             deletedTasks={deletedTasks}
             onRestoreTask={restoreTask}
             onPermanentlyDelete={permanentlyDeleteTask}
