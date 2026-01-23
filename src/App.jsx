@@ -103,9 +103,10 @@ function App() {
   // CLOUD SYNC
   // ==========================================================================
 
-  // Tracking refs to ensure sync logic always uses the latest state (prevents stale closures)
+  // Tracking refs to ensure sync logic always uses the latest state
   const tasksRef = useRef(tasks)
   const deletedTasksRef = useRef(deletedTasks)
+  const isSyncingRef = useRef(false) // Prevents sync loops
 
   useEffect(() => { tasksRef.current = tasks }, [tasks])
   useEffect(() => { deletedTasksRef.current = deletedTasks }, [deletedTasks])
@@ -168,7 +169,7 @@ function App() {
           }
         })
         const mergedDeleted = Array.from(deletedMap.values())
-        
+
         // 2. Merge Main Tasks using the NEWLY calculated mergedDeleted
         setTasks(currentLocalTasks => {
           const localMap = new Map(currentLocalTasks.map(t => [t.id, t]))
@@ -207,12 +208,15 @@ function App() {
     if (!session) return
 
     const timer = setTimeout(async () => {
-      // SAFEGUARD: Don't sync empty data on initial load if we've never synced before
+      // Check if we are already syncing or if there's no data to sync
+      if (isSyncingRef.current) return
+
       if (tasks.length === 0 && deletedTasks.length === 0) {
         if (!localStorage.getItem('eisenpower-has-synced')) return
       }
 
       try {
+        isSyncingRef.current = true
         localStorage.setItem('eisenpower-tasks-backup', JSON.stringify(tasks))
 
         const { error } = await supabase
@@ -221,22 +225,24 @@ function App() {
             {
               user_id: session.user.id,
               tasks: tasks,
-              deleted_tasks: deletedTasks,
-              updated_at: new Date().toISOString()
+              deleted_tasks: deletedTasks
             },
             { onConflict: 'user_id' }
           )
 
         if (error) {
-          console.error('❌ Sync error:', error)
+          console.error('❌ Sync error:', error.message || error)
         } else {
           localStorage.setItem('eisenpower-has-synced', 'true')
-          console.log(`📤 Synced: ${tasks.length} tasks, ${deletedTasks.length} deleted`)
+          console.log(`📤 Synced: ${tasks.length} tasks`)
         }
       } catch (err) {
         console.error('❌ Sync catch:', err)
+      } finally {
+        // Prevent immediate re-sync from realtime event that WE just triggered
+        setTimeout(() => { isSyncingRef.current = false }, 2000)
       }
-    }, 1000) // Increased to 1s to reduce write frequency
+    }, 1000)
 
     return () => clearTimeout(timer)
   }, [tasks, deletedTasks, session])
@@ -256,7 +262,10 @@ function App() {
           filter: `user_id=eq.${session.user.id}`
         },
         (payload) => {
-          console.log('☁️ Remote change detected:', payload.eventType)
+          // Ignore updates triggered by our own local syncing
+          if (isSyncingRef.current) return
+
+          console.log('☁️ Remote change detected')
           loadCloudData()
         }
       )
