@@ -20,6 +20,9 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
 
     const [text, setText] = useState('')
     const [subtasks, setSubtasks] = useState([])
+    const [dueDate, setDueDate] = useState('')
+    const [durationDays, setDurationDays] = useState(0)
+    const [autoUrgency, setAutoUrgency] = useState(true)
     const inputRef = useRef(null)
 
     // ==========================================================================
@@ -33,6 +36,9 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
         if (isOpen) {
             setText('')
             setSubtasks([])
+            setDueDate('')
+            setDurationDays(0)
+            setAutoUrgency(true)
             setTimeout(() => inputRef.current?.focus(), 10)
         }
     }, [isOpen])
@@ -70,7 +76,10 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
 
         onSubmit({
             text: text.trim(),
-            subtasks: subtasks.filter(s => s.text.trim() !== '')
+            subtasks: subtasks.filter(s => s.text.trim() !== ''),
+            dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+            durationDays,
+            autoUrgency
         })
     }
 
@@ -149,6 +158,36 @@ export default function TaskModal({ isOpen, onClose, onSubmit, position }) {
                                     No sub-tasks added yet.
                                 </p>
                             )}
+                        </div>
+                    </div>
+
+                    {/* Deadline Section */}
+                    <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700 space-y-3">
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">
+                                    Due Date (Optional)
+                                </label>
+                                <input
+                                    type="date"
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:border-indigo-400"
+                                    value={dueDate}
+                                    onChange={(e) => setDueDate(e.target.value)}
+                                />
+                            </div>
+                            <div className="w-20">
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1">
+                                    Days
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    placeholder="0"
+                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm outline-none focus:border-indigo-400"
+                                    value={durationDays || ''}
+                                    onChange={(e) => setDurationDays(parseInt(e.target.value) || 0)}
+                                />
+                            </div>
                         </div>
                     </div>
 

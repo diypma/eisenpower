@@ -48,7 +48,8 @@ export default function TaskNode({
     onMouseEnter,
     onMouseLeave,
     isHighlighted = false,
-    onReturnSubtask
+    onReturnSubtask,
+    onUpdateTask
 }) {
     // ==========================================================================
     // STATE & REFS
@@ -248,10 +249,13 @@ export default function TaskNode({
                 ? 'z-50 scale-110 shadow-2xl'
                 : 'z-10 hover:scale-105 transition-all duration-200'
                 } ${isHighlighted ? 'ring-4 ring-offset-2 rounded-2xl' : ''
-                }`}
+                } ${task.urgencyShifted ? 'animate-pulse-urgency' : ''}`}
             onMouseDown={handleMouseDown}
             onTouchStart={handleMouseDown}
-            onMouseEnter={onMouseEnter}
+            onMouseEnter={(e) => {
+                onMouseEnter?.(e);
+                if (task.urgencyShifted) onUpdateTask?.(task.id, { urgencyShifted: false });
+            }}
             onMouseLeave={onMouseLeave}
             data-task-id={task.id}
             style={{
@@ -292,6 +296,21 @@ export default function TaskNode({
                 <div className="flex items-start justify-between gap-2 overflow-hidden">
                     <span className={`leading-tight break-words line-clamp-4 ${isSubtaskNode ? 'text-xs' : ''}`}>{task.text}</span>
                 </div>
+
+                {/* Due Date Info */}
+                {task.dueDate && !isSubtaskNode && (
+                    <div className="mt-1 flex items-center gap-1 text-[9px] font-black uppercase tracking-tighter text-white/90">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {(() => {
+                            const days = Math.ceil((new Date(task.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+                            if (days < 0) return 'Overdue';
+                            if (days === 0) return 'Due Today';
+                            return `${days}d left`;
+                        })()}
+                    </div>
+                )}
 
                 {/* Footer: Priority Score & Subtask Count */}
                 {!isSubtaskNode && (

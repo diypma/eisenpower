@@ -24,7 +24,7 @@ export default function TaskDetailModal({
     onComplete,
     onSubtaskDragStart,
     onAddSubtask,
-    onEditTask,
+    onUpdateTask,
     onEditSubtask,
     onDrop,
     gridRef
@@ -49,6 +49,11 @@ export default function TaskDetailModal({
         setEditingSubtaskId(null)
         setEditedSubtaskText('')
     }, [task?.id, isOpen])
+
+    /** Handle direct updates for new fields */
+    const handleFieldUpdate = (field, value) => {
+        onUpdateTask(task.id, { [field]: value })
+    }
 
     // ==========================================================================
     // EVENT HANDLERS
@@ -133,7 +138,7 @@ export default function TaskDetailModal({
     /** Save edited task title */
     const saveTaskTitle = () => {
         if (editedTaskTitle.trim() && editedTaskTitle !== task.text) {
-            onEditTask(task.id, editedTaskTitle.trim())
+            onUpdateTask(task.id, { text: editedTaskTitle.trim() })
         }
         setEditingTaskTitle(false)
     }
@@ -225,6 +230,63 @@ export default function TaskDetailModal({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
+                </div>
+
+                {/* Deadlines & Automation Section */}
+                <div className="mb-8 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700/50 space-y-4">
+                    <div className="flex flex-wrap gap-4">
+                        {/* Due Date Input */}
+                        <div className="flex-1 min-w-[140px]">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">
+                                Due Date
+                            </label>
+                            <input
+                                type="date"
+                                value={task.dueDate ? task.dueDate.split('T')[0] : ''}
+                                onChange={(e) => handleFieldUpdate('dueDate', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                            />
+                        </div>
+
+                        {/* Duration Input */}
+                        <div className="w-24">
+                            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1.5">
+                                Days Needed
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={task.durationDays || ''}
+                                onChange={(e) => handleFieldUpdate('durationDays', parseInt(e.target.value) || 0)}
+                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Auto-Urgency Toggle */}
+                    {task.dueDate && (
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Auto-increase urgency</span>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500">Task will slide right as deadline approaches</span>
+                            </div>
+                            <button
+                                onClick={() => handleFieldUpdate('autoUrgency', !task.autoUrgency)}
+                                className={`
+                                    relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20
+                                    ${task.autoUrgency !== false ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-700'}
+                                `}
+                            >
+                                <span
+                                    className={`
+                                        inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200
+                                        ${task.autoUrgency !== false ? 'translate-x-6' : 'translate-x-1'}
+                                    `}
+                                />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Subtasks Section */}

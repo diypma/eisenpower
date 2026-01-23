@@ -319,6 +319,67 @@ function App() {
     }))
   }, []) // Run once on mount
 
+  // ==========================================================================
+  // DYNAMIC URGENCY ENGINE
+  // ==========================================================================
+
+  /**
+   * runUrgencyEngine - Automatically boosts task urgency as deadlines approach.
+   * Handles:
+   * - Deadline + Duration: Ramps up 7 days before "Must Start" date.
+   * - Deadline Only: Ramps up 5 days before Due Date.
+   * - Shift Detection: Adds 'urgencyShifted' flag to draw user attention.
+   */
+  const runUrgencyEngine = () => {
+    setTasks(prev => {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let shifted = false;
+
+      const updatedTasks = prev.map(task => {
+        if (!task.dueDate || task.autoUrgency === false || task.completed) return task;
+
+        const due = new Date(task.dueDate);
+        const duration = task.durationDays || 0;
+
+        // Panic Date = The last possible day to start
+        const panicDate = new Date(due);
+        panicDate.setDate(due.getDate() - duration);
+
+        // Pressure Window: How early to start the drift
+        const windowSize = task.durationDays ? 7 : 5;
+
+        const diffDays = Math.ceil((panicDate - today) / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= windowSize) {
+          // Calculate ramped urgency (capped at 98% to leave edge room)
+          let targetX = 98;
+          if (diffDays > 0) {
+            const progress = (windowSize - diffDays) / windowSize;
+            targetX = task.x + (98 - task.x) * progress;
+          }
+
+          // Only update if it's a significant forward shift
+          if (targetX > task.x + 0.1) {
+            shifted = true;
+            return { ...task, x: targetX, urgencyShifted: true, updatedAt: Date.now() };
+          }
+        }
+        return task;
+      });
+
+      if (shifted) console.log('⚡ Urgency Engine: Tasks shifted due to approaching deadlines');
+      return updatedTasks;
+    });
+  };
+
+  /** Run engine on initial load */
+  useEffect(() => {
+    // Small delay to ensure state and theme are ready
+    const timer = setTimeout(runUrgencyEngine, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Modal and UI state
   const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
   const [expandedTaskId, setExpandedTaskId] = useState(null)
@@ -336,7 +397,7 @@ function App() {
   }
 
   /** Create a new task from the modal form data */
-  const handleCreateTask = ({ text, subtasks }) => {
+  const handleCreateTask = ({ text, subtasks, dueDate, durationDays, autoUrgency }) => {
     const now = Date.now()
     const newTask = {
       id: now,
@@ -344,6 +405,9 @@ function App() {
       x: modalState.x,
       y: modalState.y,
       subtasks: subtasks.map((s, i) => ({ ...s, id: now + 1 + i })),
+      dueDate,
+      durationDays,
+      autoUrgency,
       updatedAt: now
     }
     setTasks([...tasks, newTask])
@@ -429,10 +493,10 @@ function App() {
     setExpandedTaskId(null)
   }
 
-  /** Edit task title */
-  const editTask = (taskId, newText) => {
+  /** Update task specific fields */
+  const updateTask = (taskId, updates) => {
     setTasks(prev => prev.map(task =>
-      task.id === taskId ? { ...task, text: newText, updatedAt: Date.now() } : task
+      task.id === taskId ? { ...task, ...updates, updatedAt: Date.now() } : task
     ))
   }
 
@@ -551,6 +615,7 @@ function App() {
                   onMouseLeave={() => setHoveredTaskFamily(null)}
                   isHighlighted={hoveredTaskFamily === task.id}
                   onReturnSubtask={handleReturnSubtask}
+                  onUpdateTask={updateTask}
                 />
               ))}
 
@@ -601,6 +666,7 @@ function App() {
                       onMouseLeave={() => setHoveredTaskFamily(null)}
                       isHighlighted={hoveredTaskFamily === task.id}
                       onReturnSubtask={handleReturnSubtask}
+                      onUpdateTask={updateTask}
                     />
                   ))
               })}
@@ -657,7 +723,7 @@ function App() {
         onToggleSubtask={toggleSubtask}
         onDelete={deleteTask}
         onComplete={completeTask}
-        onEditTask={editTask}
+        onUpdateTask={updateTask}
         onEditSubtask={editSubtask}
         onAddSubtask={(taskId, text) => {
           setTasks(prev => prev.map(task => {
