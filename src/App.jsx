@@ -58,6 +58,30 @@ function App() {
       ]
     } catch (e) {
       console.error('Failed to parse tasks', e)
+      // Try loading from backup
+      try {
+        const backup = localStorage.getItem('eisenpower-tasks-backup')
+        if (backup) {
+          console.warn('Loaded from backup due to parse failure')
+          return JSON.parse(backup)
+        }
+      } catch (e2) {
+        console.error('Backup also failed', e2)
+      }
+      return []
+    }
+  })
+
+  /**
+   * Deleted tasks array (recycle bin) - persisted to localStorage
+   * Each deleted task has: all original fields + deletedAt timestamp
+   * Auto-purged after 24 hours
+   */
+  const [deletedTasks, setDeletedTasks] = useState(() => {
+    try {
+      const saved = localStorage.getItem('eisenpower-deleted')
+      return saved ? JSON.parse(saved) : []
+    } catch (e) {
       return []
     }
   })
@@ -176,11 +200,15 @@ function App() {
         // Create backup before syncing
         localStorage.setItem('eisenpower-tasks-backup', JSON.stringify(tasks))
 
-        // Upsert: Insert if not exists, update if exists
+        // Upsert: tasks AND deletedTasks to keep recycle bin in sync
         const { error } = await supabase
           .from('user_data')
           .upsert(
-            { user_id: user.id, tasks: tasks },
+            {
+              user_id: user.id,
+              tasks: tasks,
+              deleted_tasks: deletedTasks  // Sync recycle bin
+            },
             { onConflict: 'user_id' }
           )
 
@@ -190,10 +218,10 @@ function App() {
       } catch (err) {
         console.error('Error syncing to cloud:', err)
       }
-    }, 1000)
+    }, 500) // Reduced to 500ms for faster sync
 
     return () => clearTimeout(timer)
-  }, [tasks, session])
+  }, [tasks, deletedTasks, session]) // Also sync when deletedTasks changes
 
   /** Real-time subscription to listen for changes from other devices */
   useEffect(() => {
@@ -252,6 +280,23 @@ function App() {
     }
   }, [theme])
 
+  /** Persist deleted tasks (recycle bin) to localStorage */
+  useEffect(() => {
+    localStorage.setItem('eisenpower-deleted', JSON.stringify(deletedTasks))
+  }, [deletedTasks])
+
+  /** Auto-purge deleted tasks older than 24 hours */
+  useEffect(() => {
+    const now = Date.now()
+    const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000)
+
+    setDeletedTasks(prev => prev.filter(task => {
+      const deletedTime = new Date(task.deletedAt).getTime()
+      return deletedTime > twentyFourHoursAgo
+    }))
+  }, []) // Run once on mount
+
+
   // ==========================================================================
   // TASK OPERATIONS
   // ==========================================================================
@@ -281,10 +326,31 @@ function App() {
     ))
   }
 
-  /** Delete a task by ID */
+  /** Delete a task by ID (moves to recycle bin) */
   const deleteTask = (id) => {
+    const taskToDelete = tasks.find(t => t.id === id)
+    if (taskToDelete) {
+      // Move to recycle bin with timestamp
+      setDeletedTasks(prev => [...prev, { ...taskToDelete, deletedAt: new Date().toISOString() }])
+    }
     setTasks(prev => prev.filter(t => t.id !== id))
     if (expandedTaskId === id) setExpandedTaskId(null)
+  }
+
+  /** Restore a task from recycle bin */
+  const restoreTask = (id) => {
+    const taskToRestore = deletedTasks.find(t => t.id === id)
+    if (taskToRestore) {
+      // Remove deletedAt timestamp and add back to tasks
+      const { deletedAt, ...restoredTask } = taskToRestore
+      setTasks(prev => [...prev, restoredTask])
+      setDeletedTasks(prev => prev.filter(t => t.id !== id))
+    }
+  }
+
+  /** Permanently delete a task from recycle bin */
+  const permanentlyDeleteTask = (id) => {
+    setDeletedTasks(prev => prev.filter(t => t.id !== id))
   }
 
   /** Toggle a subtask's completed state */
@@ -413,6 +479,9 @@ function App() {
             isDark={theme === 'dark'}
             onToggleTheme={toggleTheme}
             session={session}
+            deletedTasks={deletedTasks}
+            onRestoreTask={restoreTask}
+            onPermanentlyDelete={permanentlyDeleteTask}
           />
         </div>
       </header>

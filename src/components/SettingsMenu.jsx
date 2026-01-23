@@ -13,7 +13,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
-export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, session }) {
+export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, session, deletedTasks = [], onRestoreTask, onPermanentlyDelete }) {
     // ==========================================================================
     // STATE & REFS
     // ==========================================================================
@@ -23,6 +23,7 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState(null)
     const [showLogin, setShowLogin] = useState(false)
+    const [showRecycleBin, setShowRecycleBin] = useState(false)
 
     const menuRef = useRef(null)
     const fileInputRef = useRef(null)
@@ -291,11 +292,77 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
 
                         <div className="h-px bg-slate-100 dark:bg-slate-700 mx-2 my-1" />
 
+                        {/* Recycle Bin */}
+                        <button
+                            onClick={() => setShowRecycleBin(!showRecycleBin)}
+                            className="w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 transition-colors group"
+                        >
+                            <svg className="w-5 h-5 text-slate-400 group-hover:text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <div className="flex flex-col flex-1">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Recycle Bin</span>
+                                <span className="text-[10px] text-slate-400">
+                                    {deletedTasks.length} deleted task{deletedTasks.length !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                            <svg className={`w-4 h-4 text-slate-400 transition-transform ${showRecycleBin ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        {showRecycleBin && deletedTasks.length > 0 && (
+                            <div className="px-4 pb-3 space-y-2">
+                                {deletedTasks.map(task => {
+                                    const deletedTime = new Date(task.deletedAt).getTime()
+                                    const expiresAt = deletedTime + (24 * 60 * 60 * 1000)
+                                    const hoursLeft = Math.max(0, Math.round((expiresAt - Date.now()) / (60 * 60 * 1000)))
+
+                                    return (
+                                        <div key={task.id} className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 flex items-center gap-3">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{task.text}</p>
+                                                <p className="text-[10px] text-slate-400">Expires in {hoursLeft}h</p>
+                                            </div>
+                                            <button
+                                                onClick={() => onRestoreTask(task.id)}
+                                                className="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition-colors"
+                                                title="Restore"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                onClick={() => onPermanentlyDelete(task.id)}
+                                                className="p-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                                                title="Delete forever"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+
+                        {showRecycleBin && deletedTasks.length === 0 && (
+                            <div className="px-4 pb-3">
+                                <p className="text-xs text-slate-400 text-center py-2">No deleted tasks</p>
+                            </div>
+                        )}
+
+                        <div className="h-px bg-slate-100 dark:bg-slate-700 mx-2 my-1" />
+
                         {/* Clear All Data - Danger Zone */}
                         <button
                             onClick={() => {
                                 if (window.confirm("Are you sure you want to delete ALL your tasks? This cannot be undone.")) {
                                     if (window.confirm("This is your last chance! All tasks will be permanently deleted. Continue?")) {
+                                        // Create backup before clearing
+                                        localStorage.setItem('eisenpower-tasks-pre-clear', JSON.stringify(tasks))
                                         setTasks([])
                                         localStorage.removeItem('eisenpower-tasks')
                                         alert("All data has been cleared.")
