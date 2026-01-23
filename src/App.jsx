@@ -9,7 +9,7 @@
  * - Drag-and-drop task positioning on the matrix
  * - Dark/Light theme support
  * - Mobile-responsive tabbed interface
- * - LocalStorage + Supabase Cloud Sync
+ * - LocalStorage Persistence
  * - Zoom controls for dense task layouts
  * 
  * 🚀 AI AGENT INSTRUCTION:
@@ -29,7 +29,6 @@ import TaskModal from './components/TaskModal'
 import TaskDetailModal from './components/TaskDetailModal'
 import SettingsMenu from './components/SettingsMenu'
 import { getTaskAccentColor } from './utils/colorUtils'
-import { supabase } from './lib/supabase'
 
 function App() {
   // ==========================================================================
@@ -95,208 +94,6 @@ function App() {
     return localStorage.getItem('eisenpower-theme') || 'light'
   })
 
-  // Supabase Session State
-  const [session, setSession] = useState(null)
-  const isSyncing = useRef(false) // Ref to prevent loops
-
-  // ==========================================================================
-  // CLOUD SYNC
-  // ==========================================================================
-
-  // Tracking refs to ensure sync logic always uses the latest state
-  const tasksRef = useRef(tasks)
-  const deletedTasksRef = useRef(deletedTasks)
-  const lastSyncedDataRef = useRef(null) // Stores JSON string of last successful sync
-  const syncInProgressRef = useRef(false) // Prevents overlapping concurrent writes
-
-  useEffect(() => { tasksRef.current = tasks }, [tasks])
-  useEffect(() => { deletedTasksRef.current = deletedTasks }, [deletedTasks])
-
-  /** Initialize Auth Listener */
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-    })
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  /** Load data from cloud on login */
-  useEffect(() => {
-    if (session) {
-      loadCloudData()
-    }
-  }, [session])
-
-  /**
-   * Load tasks from Supabase
-   * Merge strategy: Last-Write-Wins (LWW) using updatedAt timestamp.
-   */
-  const loadCloudData = async () => {
-    if (!session) return
-
-    try {
-      const { data, error } = await supabase
-        .from('user_data')
-        .select('tasks, deleted_tasks')
-        .eq('user_id', session.user.id)
-        .maybeSingle()
-
-      if (error) {
-        console.error('❌ Supabase read error:', error)
-        return
-      }
-
-      const cloudTasks = (data && data.tasks) ? data.tasks : []
-      const cloudDeleted = (data && data.deleted_tasks) ? data.deleted_tasks : []
-
-      // ATOMIC MERGE CALCULATION
-      // 1. Calculate merged Deleted Tasks
-      const deletedMap = new Map()
-      const allDeleted = [...deletedTasksRef.current, ...cloudDeleted]
-      allDeleted.forEach(t => {
-        const existing = deletedMap.get(t.id)
-        const currentVersion = (t.updatedAt || t.id)
-        const existingVersion = existing ? (existing.updatedAt || existing.id) : -1
-        if (currentVersion >= existingVersion) {
-          deletedMap.set(t.id, t)
-        }
-      })
-      const finalDeleted = Array.from(deletedMap.values())
-
-      // 2. Calculate merged Main Tasks using finalDeleted
-      const localMap = new Map(tasksRef.current.map(t => [t.id, t]))
-      const cloudMap = new Map(cloudTasks.map(t => [t.id, t]))
-      const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
-      const finalDeletedMap = new Map(finalDeleted.map(t => [t.id, t]))
-      const finalTasks = []
-
-      allIds.forEach(id => {
-        const local = localMap.get(id)
-        const cloud = cloudMap.get(id)
-        if (local && cloud) {
-          const localTime = local.updatedAt || local.id
-          const cloudTime = cloud.updatedAt || cloud.id
-          finalTasks.push(localTime >= cloudTime ? local : cloud)
-        } else if (cloud) {
-          if (!finalDeletedMap.has(id)) finalTasks.push(cloud)
-        } else if (local) {
-          if (!finalDeletedMap.has(id)) finalTasks.push(local)
-        }
-      })
-
-      // Update state once with calculated values
-      setDeletedTasks(finalDeleted)
-      setTasks(finalTasks)
-
-      // Update the "last seen" ref to prevent a feedback loop upload
-      lastSyncedDataRef.current = JSON.stringify({ tasks: finalTasks, deleted_tasks: finalDeleted })
-
-      console.log('🔄 Cloud data merged successfully')
-    } catch (err) {
-      console.error('❌ Error loading cloud data:', err)
-    }
-  }
-
-  /** Sync to cloud on change (Debounced, uses Upsert) */
-  useEffect(() => {
-    if (!session) return
-
-    const timer = setTimeout(async () => {
-      // 1. Check if a sync is already in flight
-      if (syncInProgressRef.current) return
-
-      // 2. Prepare payload and check for changes since last success
-      const currentData = { tasks, deleted_tasks: deletedTasks }
-      const currentHash = JSON.stringify(currentData)
-
-      if (currentHash === lastSyncedDataRef.current) {
-        // console.log('✅ Data already synced, skipping upload')
-        return
-      }
-
-      // SAFEGUARD: Don't sync empty data on initial load if we've never synced before
-      if (tasks.length === 0 && deletedTasks.length === 0) {
-        if (!localStorage.getItem('eisenpower-has-synced')) return
-      }
-
-      try {
-        syncInProgressRef.current = true
-        localStorage.setItem('eisenpower-tasks-backup', JSON.stringify(tasks))
-
-        const { error } = await supabase
-          .from('user_data')
-          .upsert(
-            {
-              user_id: session.user.id,
-              tasks: tasks,
-              deleted_tasks: deletedTasks
-            },
-            { onConflict: 'user_id' }
-          )
-
-        if (error) {
-          console.error('❌ Sync error:', error.message || error)
-        } else {
-          lastSyncedDataRef.current = currentHash
-          localStorage.setItem('eisenpower-has-synced', 'true')
-          console.log(`📤 Synced: ${tasks.length} tasks`)
-        }
-      } catch (err) {
-        console.error('❌ Sync catch:', err)
-      } finally {
-        syncInProgressRef.current = false
-      }
-    }, 1500) // Increased debounce to 1.5s for stability
-
-    return () => clearTimeout(timer)
-  }, [tasks, deletedTasks, session])
-
-  /** Real-time subscription to listen for changes from other devices */
-  useEffect(() => {
-    if (!session) return
-
-    const channel = supabase
-      .channel(`user-sync-${session.user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_data',
-          filter: `user_id=eq.${session.user.id}`
-        },
-        (payload) => {
-          // Always listen for remote changes. The LWW merge handles consistency.
-          console.log('☁️ Remote change detected', payload.eventType)
-          loadCloudData()
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Realtime connected')
-        }
-      })
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [session])
-
-  // Modal and UI state
-  const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
-  const [expandedTaskId, setExpandedTaskId] = useState(null)
-  const [hoveredTaskFamily, setHoveredTaskFamily] = useState(null)
-  const [activeTab, setActiveTab] = useState('matrix') // Mobile tab: 'matrix' | 'list'
-  const [zoom, setZoom] = useState(1) // Grid zoom level (0.2 - 2.0)
-  const graphContainerRef = useRef(null)
-
   // ==========================================================================
   // PERSISTENCE EFFECTS
   // ==========================================================================
@@ -332,6 +129,13 @@ function App() {
     }))
   }, []) // Run once on mount
 
+  // Modal and UI state
+  const [modalState, setModalState] = useState({ isOpen: false, x: 50, y: 50 })
+  const [expandedTaskId, setExpandedTaskId] = useState(null)
+  const [hoveredTaskFamily, setHoveredTaskFamily] = useState(null)
+  const [activeTab, setActiveTab] = useState('matrix') // Mobile tab: 'matrix' | 'list'
+  const [zoom, setZoom] = useState(1) // Grid zoom level (0.2 - 2.0)
+  const graphContainerRef = useRef(null)
 
   // ==========================================================================
   // TASK OPERATIONS
@@ -526,7 +330,6 @@ function App() {
             setTasks={setTasks}
             isDark={theme === 'dark'}
             onToggleTheme={toggleTheme}
-            session={session}
             deletedTasks={deletedTasks}
             onRestoreTask={restoreTask}
             onPermanentlyDelete={permanentlyDeleteTask}
