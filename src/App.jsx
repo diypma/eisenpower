@@ -7,10 +7,9 @@
  * Key Features:
  * - Task creation, editing, and deletion
  * - Drag-and-drop task positioning on the matrix
- * - Sub-task management with grid extraction
  * - Dark/Light theme support
  * - Mobile-responsive tabbed interface
- * - LocalStorage persistence
+ * - LocalStorage + Supabase Cloud Sync
  * - Zoom controls for dense task layouts
  */
 
@@ -97,7 +96,7 @@ function App() {
   /**
    * Load tasks from Supabase
    * Merge strategy: Combine Cloud and Local tasks. Unique by ID.
-   * If conflict, Cloud wins (to enable cross-device sync).
+   * Local tasks not in the cloud are uploaded (Ensures no data loss).
    */
   const loadCloudData = async () => {
     try {
