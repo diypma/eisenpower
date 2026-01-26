@@ -81,23 +81,28 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
         setMessage(null)
 
         try {
-            const { error } = await supabase.auth.verifyOtp({
+            const { data, error } = await supabase.auth.verifyOtp({
                 email,
                 token: otpCode,
                 type: 'email'
             })
             if (error) throw error
 
-            // Success! The Auth listener in App.jsx will catch the new session
-            setShowLogin(false)
-            setAuthStep('email')
-            setOtpCode('')
-            setMessage(null)
-            setEmail('')
+            if (data?.session) {
+                // Success! Force reload to ensure clean state and fresh sync
+                setMessage('Success! Logging you in...')
+                setTimeout(() => window.location.reload(), 500)
+            } else {
+                setMessage('Verification successful. Please wait...')
+                // Fallback if session isn't in response (rare)
+                setShowLogin(false)
+                setAuthStep('email')
+                setOtpCode('')
+                setEmail('')
+            }
         } catch (error) {
             console.error(error)
             alert(error.error_description || error.message)
-        } finally {
             setLoading(false)
         }
     }
