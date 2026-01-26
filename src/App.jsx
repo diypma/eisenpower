@@ -20,7 +20,7 @@
 
 import pkg from '../package.json'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import GraphPaper from './components/GraphPaper'
 import TaskNode from './components/TaskNode'
 import PriorityPanel from './components/PriorityPanel'
@@ -364,15 +364,20 @@ function App() {
   // ==========================================================================
 
   /** Open the task creation modal at the specified grid position */
-  const handleOpenModal = (x, y) => {
+  const handleOpenModal = useCallback((x, y) => {
     setModalState({ isOpen: true, x, y })
-  }
+  }, [])
 
   /** Create a new task from the modal form data */
-  const handleCreateTask = async ({ text, subtasks, dueDate, durationDays, autoUrgency }) => {
+  const handleCreateTask = useCallback(async ({ text, subtasks, dueDate, durationDays, autoUrgency }) => {
     const now = Date.now()
+    // CRITICAL FIX: Use a stable UUID from the start. 
+    // Previously we used Date.now() then swapped to DB UUID, which caused the component to unmount/remount 
+    // (ghosting) if the user tried to drag immediately after creation.
+    const newId = crypto.randomUUID()
+
     const newTask = {
-      id: now.toString(), // Temporary ID, will be replaced by Supabase UUID if we re-fetch, but for now string is safer
+      id: newId,
       text,
       x: modalState.x,
       y: modalState.y,
@@ -386,46 +391,48 @@ function App() {
 
     // Optimistic Update
     setTasks(prev => [...prev, newTask])
-    setModalState({ ...modalState, isOpen: false })
+    setModalState(prev => ({ ...prev, isOpen: false }))
 
     if (session) {
       try {
         const dbPayload = {
           ...mapTaskToDb(newTask),
+          id: newId, // Explicitly set the ID we generated
           user_id: session.user.id
         }
-        // Let Supabase generate the ID
-        const { data, error } = await supabase.from('tasks').insert(dbPayload).select().single()
 
-        if (data) {
-          // Update the local task with the real UUID from DB
-          setTasks(prev => prev.map(t => t.id === newTask.id ? mapTaskFromDb(data) : t))
+        // precise insert, no need to select back and swap
+        const { error } = await supabase.from('tasks').insert(dbPayload)
+
+        if (error) {
+          console.error('Failed to sync new task to cloud:', error)
+          // Optional: Show error toast?
         }
       } catch (err) {
         console.error('Failed to create task:', err)
       }
     }
-  }
+  }, [modalState.x, modalState.y, session])
 
   /** Move a task (Local State Only - High Performance) */
-  const moveTask = (id, x, y) => {
+  const moveTask = useCallback((id, x, y) => {
     setTasks(prev => prev.map(task =>
       task.id === id ? { ...task, x, y, updatedAt: Date.now() } : task
     ))
-  }
+  }, [])
 
   /** Commit new position to Database (Called on Drag End) */
-  const handleMoveEnd = (id, x, y) => {
+  const handleMoveEnd = useCallback((id, x, y) => {
     if (session) {
       supabase.from('tasks')
         .update({ x_position: x, y_position: y, updated_at: new Date().toISOString() })
         .eq('id', id)
         .then()
     }
-  }
+  }, [session])
 
   /** Move Subtask (Local State Only) */
-  const moveSubtask = (parentId, subtaskId, x, y) => {
+  const moveSubtask = useCallback((parentId, subtaskId, x, y) => {
     setTasks(prev => prev.map(task => {
       if (task.id === parentId) {
         return {
@@ -438,74 +445,90 @@ function App() {
       }
       return task
     }))
-  }
+  }, [])
 
   /** Commit Subtask to Database */
-  const handleSubtaskMoveEnd = (parentId, subtaskId, x, y) => {
-    // Get the latest task state to ensure we save the full valid array
-    // Note: We access the 'tasks' state directly. 
-    // Ideally this should use a functional update or refs, but since this runs on 'Drop',
-    // the render cycle should be fresh enough. 
-    const task = tasks.find(t => t.id === parentId)
-    if (!task || !session) return
+  const handleSubtaskMoveEnd = useCallback((parentId, subtaskId, x, y) => {
+    // We need to access the LATEST tasks state to save correctly.
+    // Using a functional update pattern in set state is for updating, but here we need to READ to write to DB.
+    // We will use the tasks dependency. 
+    setTasks(currentTasks => {
+      const task = currentTasks.find(t => t.id === parentId)
+      if (!task || !session) return currentTasks
 
-    const updatedSubtasks = task.subtasks.map(s =>
-      s.id === subtaskId ? { ...s, x, y } : s
-    )
+      const updatedSubtasks = task.subtasks.map(s =>
+        s.id === subtaskId ? { ...s, x, y } : s
+      )
 
-    supabase.from('tasks')
-      .update({ subtasks: updatedSubtasks, updated_at: new Date().toISOString() })
-      .eq('id', parentId)
-      .then()
-  }
+      supabase.from('tasks')
+        .update({ subtasks: updatedSubtasks, updated_at: new Date().toISOString() })
+        .eq('id', parentId)
+        .then()
+
+      return currentTasks
+    })
+  }, [session])
 
   /** Delete a task by ID (moves to recycle bin) */
-  const deleteTask = (id) => {
+  const deleteTask = useCallback((id) => {
     const now = Date.now()
-    const taskToDelete = tasks.find(t => t.id === id)
-    if (taskToDelete) {
-      // Local Recycle Bin
-      setDeletedTasks(prev => [...prev, {
-        ...taskToDelete,
-        deletedAt: new Date().toISOString(),
-        updatedAt: now
-      }])
-    }
-    setTasks(prev => prev.filter(t => t.id !== id))
-    if (expandedTaskId === id) setExpandedTaskId(null)
+
+    // Use functional updates to avoid dependency on 'tasks'
+    setTasks(prevTasks => {
+      const taskToDelete = prevTasks.find(t => t.id === id)
+      if (taskToDelete) {
+        setDeletedTasks(prevDeleted => [...prevDeleted, {
+          ...taskToDelete,
+          deletedAt: new Date().toISOString(),
+          updatedAt: now
+        }])
+      }
+      return prevTasks.filter(t => t.id !== id)
+    })
+
+    setExpandedTaskId(prev => prev === id ? null : prev)
 
     if (session) {
       supabase.from('tasks').delete().eq('id', id).then()
     }
-  }
+  }, [session])
 
   /** Restore a task from recycle bin */
-  const restoreTask = async (id) => {
-    const taskToRestore = deletedTasks.find(t => t.id === id)
-    if (taskToRestore) {
-      const { deletedAt, ...restoredTask } = taskToRestore
-      const restored = { ...restoredTask, updatedAt: Date.now() }
+  const restoreTask = useCallback(async (id) => {
+    // Need access to deletedTasks. 
+    // Since this is rarely called (not high frequency), we can depend on deletedTasks.
+    // However, to be safe, let's use the functional update pattern if possible, 
+    // but we need to READ deletedTasks to restore. 
+    // We will use a ref or just depend on deletedTasks. 
+    // Actually, restoreTask is passed to SettingsMenu, not TaskNode, so it's less critical for grid performance.
+    // But consistency is good.
 
-      setTasks(prev => [...prev, restored])
-      setDeletedTasks(prev => prev.filter(t => t.id !== id))
+    setDeletedTasks(prevDeleted => {
+      const taskToRestore = prevDeleted.find(t => t.id === id)
+      if (taskToRestore) {
+        const { deletedAt, ...restoredTask } = taskToRestore
+        const restored = { ...restoredTask, updatedAt: Date.now() }
 
-      if (session) {
-        // We need to re-insert it because we Hard Deleted it.
-        // If ID is UUID, we can try to reuse it? Supabase allows specifying ID on insert.
-        const dbPayload = mapTaskToDb(restored)
-        dbPayload.id = restored.id
-        await supabase.from('tasks').insert(dbPayload)
+        setTasks(prev => [...prev, restored])
+
+        if (session) {
+          const dbPayload = mapTaskToDb(restored)
+          dbPayload.id = restored.id
+          supabase.from('tasks').insert(dbPayload).then()
+        }
+        return prevDeleted.filter(t => t.id !== id)
       }
-    }
-  }
+      return prevDeleted
+    })
+  }, [session])
 
   /** Permanently delete a task from recycle bin */
-  const permanentlyDeleteTask = (id) => {
+  const permanentlyDeleteTask = useCallback((id) => {
     setDeletedTasks(prev => prev.filter(t => t.id !== id))
-  }
+  }, [])
 
   /** Toggle a subtask's completed state */
-  const toggleSubtask = (taskId, subtaskId) => {
+  const toggleSubtask = useCallback((taskId, subtaskId) => {
     let updatedTask = null
 
     setTasks(prev => prev.map(task => {
@@ -534,10 +557,10 @@ function App() {
     if (updatedTask && session) {
       supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', taskId).then()
     }
-  }
+  }, [session])
 
   /** Mark a task as complete and record completion time */
-  const completeTask = (taskId) => {
+  const completeTask = useCallback((taskId) => {
     setTasks(prev => prev.map(task => {
       if (task.id === taskId) {
         return {
@@ -559,10 +582,10 @@ function App() {
           if (error) console.error('DEBUG: completeTask Failed', error)
         })
     }
-  }
+  }, [session])
 
   /** Update task specific fields */
-  const updateTask = (taskId, updates) => {
+  const updateTask = useCallback((taskId, updates) => {
     setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, ...updates, updatedAt: Date.now() } : task
     ))
@@ -579,10 +602,10 @@ function App() {
 
       supabase.from('tasks').update(dbUpdates).eq('id', taskId).then()
     }
-  }
+  }, [session])
 
   /** Update subtask specific fields */
-  const updateSubtask = (taskId, subtaskId, updates) => {
+  const updateSubtask = useCallback((taskId, subtaskId, updates) => {
     let updatedTask = null
     setTasks(prev => prev.map(task => {
       if (task.id === taskId) {
@@ -602,19 +625,19 @@ function App() {
     if (updatedTask && session) {
       supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', taskId).then()
     }
-  }
+  }, [session])
 
   /** Toggle between light and dark theme */
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
-  }
+  }, [])
 
   // ==========================================================================
   // SUBTASK GRID OPERATIONS
   // ==========================================================================
 
   /** Handle dropping a subtask onto the grid to extract it */
-  const handleSubtaskDrop = (x, y, data) => {
+  const handleSubtaskDrop = useCallback((x, y, data) => {
     if (data.type === 'SUBTASK_EXTRACT') {
       let updatedTask = null
       setTasks(prev => prev.map(t => {
@@ -637,10 +660,10 @@ function App() {
         supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', data.taskId).then()
       }
     }
-  }
+  }, [session])
 
   /** Return a subtask from the grid back to its parent task */
-  const handleReturnSubtask = (parentId, subtaskId) => {
+  const handleReturnSubtask = useCallback((parentId, subtaskId) => {
     let updatedTask = null
     setTasks(prev => prev.map(t => {
       if (t.id === parentId) {
@@ -660,7 +683,7 @@ function App() {
     if (updatedTask && session) {
       supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', parentId).then()
     }
-  }
+  }, [session])
 
   // ==========================================================================
   // RENDER

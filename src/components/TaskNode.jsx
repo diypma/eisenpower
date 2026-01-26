@@ -98,9 +98,9 @@ const TaskNode = memo(function TaskNode({
     const subtaskCount = task.subtasks?.length || 0
     const completedCount = task.subtasks?.filter(s => s.completed)?.length || 0
 
-    // = : =========================================================================
+    // ==========================================================================
     // DRAG HANDLERS
-    // =========================================================================
+    // ==========================================================================
 
     useEffect(() => {
         if (!isDragging) return
