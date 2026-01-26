@@ -146,7 +146,10 @@ function App() {
   /**
    * fetchRemoteTasks - Loads the "True State" from Supabase
    */
-  const fetchRemoteTasks = async () => {
+  /**
+   * fetchRemoteTasks - Loads the "True State" from Supabase
+   */
+  const fetchRemoteTasks = useCallback(async () => {
     if (!session) return
 
     const { data, error } = await supabase
@@ -174,7 +177,7 @@ function App() {
         // We do NOT wipe local tasks here. We wait for user to click "Migrate".
       }
     }
-  }
+  }, [session])
 
   /**
    * Realtime Subscription
@@ -253,7 +256,42 @@ function App() {
       console.log('DEBUG: Unsubscribing Realtime')
       supabase.removeChannel(channel)
     }
-  }, [session?.access_token]) // Only re-run if the ACCESS TOKEN changes
+  }, [session?.access_token, fetchRemoteTasks]) // Only re-run if the ACCESS TOKEN changes
+
+  /**
+   * Mobile Sync Reliability: Auto-refresh on Foreground
+   * Ensures that if the app was suspended or backgrounded, we catch up immediately
+   */
+  useEffect(() => {
+    if (!session) return
+
+    const handleRevalidation = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('DEBUG: App returned to foreground, force syncing...')
+        fetchRemoteTasks()
+      }
+    }
+
+    const handleFocus = () => {
+      console.log('DEBUG: App focused, checking sync...')
+      fetchRemoteTasks()
+    }
+
+    const handleOnline = () => {
+      console.log('DEBUG: App back online, force syncing...')
+      fetchRemoteTasks()
+    }
+
+    document.addEventListener('visibilitychange', handleRevalidation)
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('online', handleOnline)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleRevalidation)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [session, fetchRemoteTasks])
 
   // ==========================================================================
   // PERSISTENCE EFFECTS
