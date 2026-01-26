@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { migrateTasksToRelational } from '../utils/migration'
 
 export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, session, deletedTasks = [], onRestoreTask, onPermanentlyDelete }) {
     // ==========================================================================
@@ -26,6 +27,7 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
     const [message, setMessage] = useState(null)
     const [showLogin, setShowLogin] = useState(false)
     const [showRecycleBin, setShowRecycleBin] = useState(false)
+    const [migrating, setMigrating] = useState(false)
 
     const menuRef = useRef(null)
 
@@ -105,6 +107,29 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
         await supabase.auth.signOut()
         setIsOpen(false)
         setAuthStep('email')
+    }
+
+    const handleMigration = async () => {
+        if (!session) return
+        if (!window.confirm("This will upload all your local tasks to the new cloud database. Continue?")) return
+
+        setMigrating(true)
+        setMessage(null)
+
+        try {
+            const result = await migrateTasksToRelational(tasks, session)
+            if (result.success) {
+                alert(`Successfully migrated ${result.count} tasks!`)
+                setIsOpen(false)
+            } else {
+                alert('Migration failed: ' + (result.error?.message || 'Unknown error'))
+            }
+        } catch (e) {
+            console.error(e)
+            alert('Migration error')
+        } finally {
+            setMigrating(false)
+        }
     }
 
     // ==========================================================================
@@ -218,6 +243,13 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                             <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{session.user.email}</p>
                                         </div>
                                     </div>
+                                    <button
+                                        onClick={handleMigration}
+                                        disabled={migrating}
+                                        className="w-full py-2 mb-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                                    >
+                                        {migrating ? 'Migrating...' : 'Migrate Local Tasks to Cloud'}
+                                    </button>
                                     <button
                                         onClick={handleLogout}
                                         className="w-full py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"

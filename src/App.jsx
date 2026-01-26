@@ -98,186 +98,116 @@ function App() {
   // CLOUD SYNC v2.0 (Conflict-Resistant)
   // ==========================================================================
 
-  // Tracking refs to ensure sync logic always uses the latest state
-  const tasksRef = useRef(tasks)
-  const deletedTasksRef = useRef(deletedTasks)
-  const lastConvergedHashRef = useRef(null) // Tracks the state of the last known-good sync
-  const syncInProgressRef = useRef(false) // Prevents concurrent uploads
+  // ==========================================================================
+  // CLOUD SYNC v3.0 (Relational + Realtime)
+  // ==========================================================================
 
-  useEffect(() => { tasksRef.current = tasks }, [tasks])
-  useEffect(() => { deletedTasksRef.current = deletedTasks }, [deletedTasks])
+  // Helper: Map Supabase DB Row -> App Task Object
+  const mapTaskFromDb = (row) => ({
+    id: row.id, // UUID now, but we handle that
+    text: row.text,
+    x: row.x_position ?? 50,
+    y: row.y_position ?? 50,
+    completed: row.is_completed,
+    completedAt: row.completed_at,
+    dueDate: row.due_date,
+    durationDays: row.duration_days,
+    autoUrgency: row.auto_urgency,
+    subtasks: row.subtasks || [],
+    updatedAt: new Date(row.updated_at).getTime()
+  })
 
-  /** Initialize Auth Listener */
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-    })
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  /** Load data from cloud on login */
-  useEffect(() => {
-    if (session) {
-      loadCloudData()
-    }
-  }, [session])
+  // Helper: Map App Task Object -> Supabase DB Row
+  const mapTaskToDb = (task) => ({
+    text: task.text,
+    x_position: task.x,
+    y_position: task.y,
+    is_completed: task.completed,
+    completed_at: task.completedAt,
+    due_date: task.dueDate,
+    duration_days: task.durationDays,
+    auto_urgency: task.autoUrgency,
+    subtasks: task.subtasks || [],
+    updated_at: new Date().toISOString()
+  })
 
   /**
-   * loadCloudData - Robust 3-Way Merge
-   * Merges local state with cloud state using per-item timestamps (LWW).
+   * fetchRemoteTasks - Loads the "True State" from Supabase
    */
-  const loadCloudData = async () => {
+  const fetchRemoteTasks = async () => {
     if (!session) return
 
-    try {
-      const { data, error } = await supabase
-        .from('user_data')
-        .select('tasks, deleted_tasks')
-        .eq('user_id', session.user.id)
-        .maybeSingle()
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('created_at', { ascending: true })
 
-      if (error) {
-        console.error('❌ Supabase read error:', error)
-        return
+    if (error) {
+      console.error('Error fetching tasks:', error)
+      return
+    }
+
+    if (data) {
+      const mapped = data.map(mapTaskFromDb)
+
+      // If we have tasks in the cloud, we use them as the source of truth
+      // Merging strategy: Replace local active tasks with cloud tasks.
+      // (Migration step handles the initial upload)
+      if (mapped.length > 0) {
+        setTasks(mapped)
+        localStorage.setItem('eisenpower-has-synced-v3', 'true')
+      } else {
+        // If cloud is empty but we have local tasks, and we haven't synced v3 yet,
+        // we might be in the "Pre-Migration" state. 
+        // We do NOT wipe local tasks here. We wait for user to click "Migrate".
       }
-
-      const cloudTasks = (data && data.tasks) ? data.tasks : []
-      const cloudDeleted = (data && data.deleted_tasks) ? data.deleted_tasks : []
-
-      // 1. Calculate merged Deleted Tasks (LWW)
-      const deletedMap = new Map()
-      const allDeleted = [...deletedTasksRef.current, ...cloudDeleted]
-      allDeleted.forEach(t => {
-        const existing = deletedMap.get(t.id)
-        const currentVer = t.updatedAt || t.id
-        const existingVer = existing ? (existing.updatedAt || existing.id) : -1
-        if (currentVer >= existingVer) {
-          deletedMap.set(t.id, t)
-        }
-      })
-      const finalDeleted = Array.from(deletedMap.values())
-
-      // 2. Calculate merged Main Tasks (LWW)
-      const localMap = new Map(tasksRef.current.map(t => [t.id, t]))
-      const cloudMap = new Map(cloudTasks.map(t => [t.id, t]))
-      const allIds = new Set([...localMap.keys(), ...cloudMap.keys()])
-      const finalDeletedMap = new Map(finalDeleted.map(t => [t.id, t]))
-      const finalTasks = []
-
-      allIds.forEach(id => {
-        const local = localMap.get(id)
-        const cloud = cloudMap.get(id)
-
-        if (local && cloud) {
-          const localVer = local.updatedAt || local.id
-          const cloudVer = cloud.updatedAt || cloud.id
-          finalTasks.push(localVer >= cloudVer ? local : cloud)
-        } else if (cloud) {
-          // Keep from cloud only if not in finalDeleted
-          if (!finalDeletedMap.has(id)) finalTasks.push(cloud)
-        } else if (local) {
-          // Keep from local only if not in finalDeleted
-          if (!finalDeletedMap.has(id)) finalTasks.push(local)
-        }
-      })
-
-      // Update state & Convergence Tracker
-      setDeletedTasks(finalDeleted)
-      setTasks(finalTasks)
-
-      const convergedData = { tasks: finalTasks, deleted_tasks: finalDeleted }
-      lastConvergedHashRef.current = JSON.stringify(convergedData)
-
-      console.log('🔄 Cloud sync v2.0: Convergence reached')
-    } catch (err) {
-      console.error('❌ Merge error:', err)
     }
   }
 
-  /** Debounced Sync Upload Hook with Feedback Suppression */
+  /**
+   * Realtime Subscription
+   * Listens for precise row changes and updates local state instantly.
+   */
   useEffect(() => {
     if (!session) return
 
-    const timer = setTimeout(async () => {
-      if (syncInProgressRef.current) return
+    // 1. Initial Fetch
+    fetchRemoteTasks()
 
-      // CHECK: Do we actually have unsaved changes compared to last convergence?
-      const localData = { tasks, deleted_tasks: deletedTasks }
-      const localHash = JSON.stringify(localData)
-
-      if (localHash === lastConvergedHashRef.current) {
-        // console.log('✅ No unsaved changes (feedback loop suppressed)')
-        return
-      }
-
-      // SAFEGUARD: Don't sync completely empty data on initial load if we've never synced
-      if (tasks.length === 0 && deletedTasks.length === 0) {
-        if (!localStorage.getItem('eisenpower-has-synced')) return
-      }
-
-      try {
-        syncInProgressRef.current = true
-        localStorage.setItem('eisenpower-tasks-backup', JSON.stringify(tasks))
-
-        const { error } = await supabase
-          .from('user_data')
-          .upsert(
-            {
-              user_id: session.user.id,
-              tasks: tasks,
-              deleted_tasks: deletedTasks
-            },
-            { onConflict: 'user_id' }
-          )
-
-        if (error) {
-          console.error('❌ Sync error:', error)
-        } else {
-          lastConvergedHashRef.current = localHash
-          localStorage.setItem('eisenpower-has-synced', 'true')
-          console.log(`📤 Synced: ${tasks.length} tasks to cloud`)
-        }
-      } catch (err) {
-        console.error('❌ Sync catch:', err)
-      } finally {
-        syncInProgressRef.current = false
-      }
-    }, 1500)
-
-    return () => clearTimeout(timer)
-  }, [tasks, deletedTasks, session])
-
-  /** Non-blocking Realtime Listener */
-  useEffect(() => {
-    if (!session) return
-
+    // 2. Subscribe to Changes
     const channel = supabase
-      .channel(`user-sync-${session.user.id}`)
+      .channel('tasks-realtime')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_data',
-          filter: `user_id=eq.${session.user.id}`
-        },
+        { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${session.user.id}` },
         (payload) => {
-          console.log('☁️ Realtime: Remote change detected')
-          loadCloudData()
+          const { eventType, new: newRow, old: oldRow } = payload
+
+          if (eventType === 'INSERT') {
+            setTasks(prev => [...prev, mapTaskFromDb(newRow)])
+          }
+          else if (eventType === 'UPDATE') {
+            setTasks(prev => prev.map(t =>
+              t.id === newRow.id ? mapTaskFromDb(newRow) : t
+            ))
+          }
+          else if (eventType === 'DELETE') {
+            // If deleted remotely, remove locally. 
+            // Optional: Move to recycle bin? For now, straight delete to match sync behavior.
+            setTasks(prev => {
+              const task = prev.find(t => t.id === oldRow.id)
+              if (task) {
+                // Add to local recycle bin for safety (this ensures "Undo" works if you just deleted it on another device? No, that's confusing. 
+                // But if someone ELSE deletes it, it should vanish.)
+                // Let's just remove it.
+                return prev.filter(t => t.id !== oldRow.id)
+              }
+              return prev
+            })
+          }
         }
       )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Realtime: Subscribed to cloud updates')
-        }
-      })
+      .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
@@ -397,10 +327,10 @@ function App() {
   }
 
   /** Create a new task from the modal form data */
-  const handleCreateTask = ({ text, subtasks, dueDate, durationDays, autoUrgency }) => {
+  const handleCreateTask = async ({ text, subtasks, dueDate, durationDays, autoUrgency }) => {
     const now = Date.now()
     const newTask = {
-      id: now,
+      id: now.toString(), // Temporary ID, will be replaced by Supabase UUID if we re-fetch, but for now string is safer
       text,
       x: modalState.x,
       y: modalState.y,
@@ -408,10 +338,28 @@ function App() {
       dueDate,
       durationDays,
       autoUrgency,
-      updatedAt: now
+      updatedAt: now,
+      completed: false // Default
     }
-    setTasks([...tasks, newTask])
+
+    // Optimistic Update
+    setTasks(prev => [...prev, newTask])
     setModalState({ ...modalState, isOpen: false })
+
+    if (session) {
+      try {
+        const dbPayload = mapTaskToDb(newTask)
+        // Let Supabase generate the ID
+        const { data, error } = await supabase.from('tasks').insert(dbPayload).select().single()
+
+        if (data) {
+          // Update the local task with the real UUID from DB
+          setTasks(prev => prev.map(t => t.id === newTask.id ? mapTaskFromDb(data) : t))
+        }
+      } catch (err) {
+        console.error('Failed to create task:', err)
+      }
+    }
   }
 
   /** Move a task to a new position on the grid */
@@ -419,6 +367,10 @@ function App() {
     setTasks(prev => prev.map(task =>
       task.id === id ? { ...task, x, y, updatedAt: Date.now() } : task
     ))
+
+    if (session) {
+      supabase.from('tasks').update({ x_position: x, y_position: y, updated_at: new Date().toISOString() }).eq('id', id).then()
+    }
   }
 
   /** Delete a task by ID (moves to recycle bin) */
@@ -426,7 +378,7 @@ function App() {
     const now = Date.now()
     const taskToDelete = tasks.find(t => t.id === id)
     if (taskToDelete) {
-      // Move to recycle bin with timestamp
+      // Local Recycle Bin
       setDeletedTasks(prev => [...prev, {
         ...taskToDelete,
         deletedAt: new Date().toISOString(),
@@ -435,16 +387,29 @@ function App() {
     }
     setTasks(prev => prev.filter(t => t.id !== id))
     if (expandedTaskId === id) setExpandedTaskId(null)
+
+    if (session) {
+      supabase.from('tasks').delete().eq('id', id).then()
+    }
   }
 
   /** Restore a task from recycle bin */
-  const restoreTask = (id) => {
+  const restoreTask = async (id) => {
     const taskToRestore = deletedTasks.find(t => t.id === id)
     if (taskToRestore) {
-      // Remove deletedAt timestamp and add back to tasks
       const { deletedAt, ...restoredTask } = taskToRestore
-      setTasks(prev => [...prev, { ...restoredTask, updatedAt: Date.now() }])
+      const restored = { ...restoredTask, updatedAt: Date.now() }
+
+      setTasks(prev => [...prev, restored])
       setDeletedTasks(prev => prev.filter(t => t.id !== id))
+
+      if (session) {
+        // We need to re-insert it because we Hard Deleted it.
+        // If ID is UUID, we can try to reuse it? Supabase allows specifying ID on insert.
+        const dbPayload = mapTaskToDb(restored)
+        dbPayload.id = restored.id
+        await supabase.from('tasks').insert(dbPayload)
+      }
     }
   }
 
@@ -455,15 +420,16 @@ function App() {
 
   /** Toggle a subtask's completed state */
   const toggleSubtask = (taskId, subtaskId) => {
+    let updatedTask = null
+
     setTasks(prev => prev.map(task => {
       if (task.id === taskId) {
-        return {
+        const nextTask = {
           ...task,
           updatedAt: Date.now(),
           subtasks: task.subtasks.map(s => {
             if (s.id === subtaskId) {
               const newCompleted = !s.completed
-              // Remove from grid if completing a positioned sub-task
               if (newCompleted && s.x !== undefined && s.x !== null) {
                 return { ...s, completed: newCompleted, x: undefined, y: undefined }
               }
@@ -472,9 +438,16 @@ function App() {
             return s
           })
         }
+        updatedTask = nextTask
+        return nextTask
       }
       return task
     }))
+
+    // Sync subtasks JSON
+    if (updatedTask && session) {
+      supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', taskId).then()
+    }
   }
 
   /** Mark a task as complete and record completion time */
@@ -491,6 +464,10 @@ function App() {
       return task
     }))
     setExpandedTaskId(null)
+
+    if (session) {
+      supabase.from('tasks').update({ is_completed: true, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', taskId).then()
+    }
   }
 
   /** Update task specific fields */
@@ -498,22 +475,42 @@ function App() {
     setTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, ...updates, updatedAt: Date.now() } : task
     ))
+
+    if (session) {
+      // Map updates to DB keys
+      const dbUpdates = { updated_at: new Date().toISOString() }
+      if (updates.text !== undefined) dbUpdates.text = updates.text
+      if (updates.x !== undefined) dbUpdates.x_position = updates.x
+      if (updates.y !== undefined) dbUpdates.y_position = updates.y
+      if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate
+      if (updates.durationDays !== undefined) dbUpdates.duration_days = updates.durationDays
+      if (updates.autoUrgency !== undefined) dbUpdates.auto_urgency = updates.autoUrgency
+
+      supabase.from('tasks').update(dbUpdates).eq('id', taskId).then()
+    }
   }
 
   /** Update subtask specific fields */
   const updateSubtask = (taskId, subtaskId, updates) => {
+    let updatedTask = null
     setTasks(prev => prev.map(task => {
       if (task.id === taskId) {
-        return {
+        const nextTask = {
           ...task,
           updatedAt: Date.now(),
           subtasks: task.subtasks.map(s =>
             s.id === subtaskId ? { ...s, ...updates } : s
           )
         }
+        updatedTask = nextTask
+        return nextTask
       }
       return task
     }))
+
+    if (updatedTask && session) {
+      supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', taskId).then()
+    }
   }
 
   /** Toggle between light and dark theme */
@@ -528,36 +525,50 @@ function App() {
   /** Handle dropping a subtask onto the grid to extract it */
   const handleSubtaskDrop = (x, y, data) => {
     if (data.type === 'SUBTASK_EXTRACT') {
+      let updatedTask = null
       setTasks(prev => prev.map(t => {
         if (t.id === data.taskId) {
-          return {
+          const nextTask = {
             ...t,
             updatedAt: Date.now(),
             subtasks: t.subtasks.map(s =>
               s.id === data.subtaskId ? { ...s, x, y } : s
             )
           }
+          updatedTask = nextTask
+          return nextTask
         }
         return t
       }))
       setExpandedTaskId(null)
+
+      if (updatedTask && session) {
+        supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', data.taskId).then()
+      }
     }
   }
 
   /** Return a subtask from the grid back to its parent task */
   const handleReturnSubtask = (parentId, subtaskId) => {
+    let updatedTask = null
     setTasks(prev => prev.map(t => {
       if (t.id === parentId) {
-        return {
+        const nextTask = {
           ...t,
           updatedAt: Date.now(),
           subtasks: t.subtasks.map(s =>
             s.id === subtaskId ? { ...s, x: undefined, y: undefined } : s
           )
         }
+        updatedTask = nextTask
+        return nextTask
       }
       return t
     }))
+
+    if (updatedTask && session) {
+      supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', parentId).then()
+    }
   }
 
   // ==========================================================================
@@ -629,32 +640,45 @@ function App() {
                       key={sub.id}
                       task={{ ...sub, isSubtask: true, parentId: task.id }}
                       onMove={(id, x, y) => {
+                        // TODO: Refactor into named function for cleaner code
+                        let updatedTask = null
                         setTasks(prev => prev.map(t => {
                           if (t.id === task.id) {
-                            return {
+                            const next = {
                               ...t,
                               updatedAt: Date.now(),
                               subtasks: t.subtasks.map(s =>
                                 s.id === id ? { ...s, x, y } : s
                               )
                             }
+                            updatedTask = next
+                            return next
                           }
                           return t
                         }))
+                        if (updatedTask && session) {
+                          supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', task.id).then()
+                        }
                       }}
                       onDelete={(id) => {
+                        let updatedTask = null
                         setTasks(prev => prev.map(t => {
                           if (t.id === task.id) {
-                            return {
+                            const next = {
                               ...t,
                               updatedAt: Date.now(),
                               subtasks: t.subtasks.map(s =>
                                 s.id === id ? { ...s, x: undefined, y: undefined } : s
                               )
                             }
+                            updatedTask = next
+                            return next
                           }
                           return t
                         }))
+                        if (updatedTask && session) {
+                          supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', task.id).then()
+                        }
                       }}
                       onExpand={() => {
                         setExpandedTaskId(task.id)
@@ -726,16 +750,22 @@ function App() {
         onUpdateTask={updateTask}
         onUpdateSubtask={updateSubtask}
         onAddSubtask={(taskId, text) => {
+          let updatedTask = null
           setTasks(prev => prev.map(task => {
             if (task.id === taskId) {
-              return {
+              const next = {
                 ...task,
                 updatedAt: Date.now(),
                 subtasks: [...(task.subtasks || []), { id: Date.now(), text, completed: false }]
               }
+              updatedTask = next
+              return next
             }
             return task
           }))
+          if (updatedTask && session) {
+            supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', taskId).then()
+          }
         }}
         onSubtaskDragStart={(taskId, subtask) => {
           // Tracking hook for animations (currently unused)
