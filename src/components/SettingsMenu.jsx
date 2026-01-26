@@ -300,25 +300,42 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                                         className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                                         required
                                                     />
-                                                    <div className="flex gap-2">
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowLogin(false)}
+                                                                className="flex-1 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button
+                                                                type="submit"
+                                                                disabled={loading}
+                                                                className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 disabled:opacity-50"
+                                                            >
+                                                                {loading ? 'Sending...' : 'Send Code'}
+                                                            </button>
+                                                        </div>
                                                         <button
                                                             type="button"
-                                                            onClick={() => setShowLogin(false)}
-                                                            className="flex-1 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                                            onClick={() => setAuthStep('code')}
+                                                            className="w-full py-2 text-[10px] font-medium text-slate-400 hover:text-indigo-500 transition-colors"
                                                         >
-                                                            Cancel
-                                                        </button>
-                                                        <button
-                                                            type="submit"
-                                                            disabled={loading}
-                                                            className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 disabled:opacity-50"
-                                                        >
-                                                            {loading ? 'Sending...' : 'Send Code'}
+                                                            I already have a code
                                                         </button>
                                                     </div>
                                                 </form>
                                             ) : (
                                                 <form onSubmit={handleVerifyOtp}>
+                                                    <input
+                                                        type="email"
+                                                        placeholder="name@example.com"
+                                                        value={email}
+                                                        onChange={(e) => setEmail(e.target.value)}
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                        required
+                                                    />
                                                     <input
                                                         type="text"
                                                         inputMode="numeric"
