@@ -94,6 +94,18 @@ function App() {
   // Supabase Session State
   const [session, setSession] = useState(null)
 
+  /** Initialize Auth Listener */
+  useEffect(() => {
+    // Listen for auth changes (including initial session restoration)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
   // ==========================================================================
   // CLOUD SYNC v2.0 (Conflict-Resistant)
   // ==========================================================================
