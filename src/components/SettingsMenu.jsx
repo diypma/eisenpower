@@ -57,7 +57,7 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
             const { error } = await supabase.auth.signInWithOtp({
                 email,
                 options: {
-                    emailRedirectTo: window.location.href
+                    emailRedirectTo: window.location.origin
                 }
             })
             if (error) throw error
