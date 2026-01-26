@@ -49,7 +49,8 @@ export default function TaskNode({
     onMouseLeave,
     isHighlighted = false,
     onReturnSubtask,
-    onUpdateTask
+    onUpdateTask,
+    onMoveEnd
 }) {
     // ==========================================================================
     // STATE & REFS
@@ -95,6 +96,13 @@ export default function TaskNode({
     // DRAG HANDLERS
     // ==========================================================================
 
+    const onMoveEndRef = useRef(onMoveEnd)
+    const lastPosRef = useRef({ x: task.x, y: task.y })
+
+    useEffect(() => {
+        onMoveEndRef.current = onMoveEnd
+    }, [onMoveEnd])
+
     useEffect(() => {
         if (!isDragging) return
 
@@ -120,6 +128,7 @@ export default function TaskNode({
             const clampedX = Math.max(0, Math.min(100, newX))
             const clampedY = Math.max(0, Math.min(100, newY))
 
+            lastPosRef.current = { x: clampedX, y: clampedY }
             onMoveRef.current(task.id, clampedX, clampedY)
         }
 
@@ -143,6 +152,11 @@ export default function TaskNode({
             if (duration < 250 && distance < 6) {
                 onExpand(task.id)
                 return
+            }
+
+            // It was a drag! Commit the final position
+            if (onMoveEndRef.current) {
+                onMoveEndRef.current(task.id, lastPosRef.current.x, lastPosRef.current.y)
             }
 
             // Check if subtask was dropped back onto its parent task
@@ -186,6 +200,7 @@ export default function TaskNode({
             const clampedX = Math.max(0, Math.min(100, newX))
             const clampedY = Math.max(0, Math.min(100, newY))
 
+            lastPosRef.current = { x: clampedX, y: clampedY }
             onMoveRef.current(task.id, clampedX, clampedY)
         }
 

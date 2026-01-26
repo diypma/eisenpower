@@ -377,15 +377,56 @@ function App() {
     }
   }
 
-  /** Move a task to a new position on the grid */
+  /** Move a task (Local State Only - High Performance) */
   const moveTask = (id, x, y) => {
     setTasks(prev => prev.map(task =>
       task.id === id ? { ...task, x, y, updatedAt: Date.now() } : task
     ))
+  }
 
+  /** Commit new position to Database (Called on Drag End) */
+  const handleMoveEnd = (id, x, y) => {
     if (session) {
-      supabase.from('tasks').update({ x_position: x, y_position: y, updated_at: new Date().toISOString() }).eq('id', id).then()
+      supabase.from('tasks')
+        .update({ x_position: x, y_position: y, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .then()
     }
+  }
+
+  /** Move Subtask (Local State Only) */
+  const moveSubtask = (parentId, subtaskId, x, y) => {
+    setTasks(prev => prev.map(task => {
+      if (task.id === parentId) {
+        return {
+          ...task,
+          updatedAt: Date.now(),
+          subtasks: task.subtasks.map(s =>
+            s.id === subtaskId ? { ...s, x, y } : s
+          )
+        }
+      }
+      return task
+    }))
+  }
+
+  /** Commit Subtask to Database */
+  const handleSubtaskMoveEnd = (parentId, subtaskId, x, y) => {
+    // Get the latest task state to ensure we save the full valid array
+    // Note: We access the 'tasks' state directly. 
+    // Ideally this should use a functional update or refs, but since this runs on 'Drop',
+    // the render cycle should be fresh enough. 
+    const task = tasks.find(t => t.id === parentId)
+    if (!task || !session) return
+
+    const updatedSubtasks = task.subtasks.map(s =>
+      s.id === subtaskId ? { ...s, x, y } : s
+    )
+
+    supabase.from('tasks')
+      .update({ subtasks: updatedSubtasks, updated_at: new Date().toISOString() })
+      .eq('id', parentId)
+      .then()
   }
 
   /** Delete a task by ID (moves to recycle bin) */
@@ -642,6 +683,7 @@ function App() {
                   isHighlighted={hoveredTaskFamily === task.id}
                   onReturnSubtask={handleReturnSubtask}
                   onUpdateTask={updateTask}
+                  onMoveEnd={handleMoveEnd}
                 />
               ))}
 
@@ -654,27 +696,8 @@ function App() {
                     <TaskNode
                       key={sub.id}
                       task={{ ...sub, isSubtask: true, parentId: task.id }}
-                      onMove={(id, x, y) => {
-                        // TODO: Refactor into named function for cleaner code
-                        let updatedTask = null
-                        setTasks(prev => prev.map(t => {
-                          if (t.id === task.id) {
-                            const next = {
-                              ...t,
-                              updatedAt: Date.now(),
-                              subtasks: t.subtasks.map(s =>
-                                s.id === id ? { ...s, x, y } : s
-                              )
-                            }
-                            updatedTask = next
-                            return next
-                          }
-                          return t
-                        }))
-                        if (updatedTask && session) {
-                          supabase.from('tasks').update({ subtasks: updatedTask.subtasks, updated_at: new Date().toISOString() }).eq('id', task.id).then()
-                        }
-                      }}
+                      onMove={(subId, x, y) => moveSubtask(task.id, subId, x, y)}
+                      onMoveEnd={(subId, x, y) => handleSubtaskMoveEnd(task.id, subId, x, y)}
                       onDelete={(id) => {
                         let updatedTask = null
                         setTasks(prev => prev.map(t => {
