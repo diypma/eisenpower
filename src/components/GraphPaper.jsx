@@ -12,10 +12,14 @@
  * - Responsive design for mobile/desktop
  */
 
-import React, { useRef } from 'react'
+import React, { useRef, forwardRef, useImperativeHandle } from 'react'
 
-export default function GraphPaper({ onAddTask, onDrop, children }) {
+const GraphPaper = forwardRef(({ onAddTask, onDrop, children }, ref) => {
     const containerRef = useRef(null)
+
+    // Check if the forwarded ref is a function or object and assign correctly
+    // or use imperative handle to expose the node.
+    useImperativeHandle(ref, () => containerRef.current)
 
     // ==========================================================================
     // DRAG AND DROP HANDLERS
@@ -145,4 +149,6 @@ export default function GraphPaper({ onAddTask, onDrop, children }) {
             </div>
         </div>
     )
-}
+})
+
+export default GraphPaper
