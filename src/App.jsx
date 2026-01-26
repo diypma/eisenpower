@@ -180,10 +180,22 @@ function App() {
    * Realtime Subscription
    * Listens for precise row changes and updates local state instantly.
    */
+  // Track previous session to prevent unnecessary re-subscriptions
+  const sessionRef = useRef(session?.access_token)
+
   useEffect(() => {
     if (!session) return
 
+    // Avoid re-running if the token hasn't changed (Supabase sometimes emits new session objects with same token)
+    if (sessionRef.current === session.access_token) {
+      // checks session stability
+    }
+    sessionRef.current = session.access_token
+
+    console.log('DEBUG: Session Refreshed or Initialized', new Date().toISOString())
+
     // 1. Initial Fetch
+    console.log('DEBUG: Fetching Remote Tasks...')
     fetchRemoteTasks()
 
     // 2. Subscribe to Changes
@@ -193,6 +205,7 @@ function App() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${session.user.id}` },
         (payload) => {
+          console.log('DEBUG: Realtime Event Received', payload.eventType)
           const { eventType, new: newRow, old: oldRow } = payload
 
           if (eventType === 'INSERT') {
@@ -200,20 +213,15 @@ function App() {
           }
           else if (eventType === 'UPDATE') {
             const mapped = mapTaskFromDb(newRow)
-            // console.log('DEBUG: Realtime Update Received', { eventType, newRow, mapped })
+            // Prevent overwriting local drag state if the update is just a coordinate echo (optional, but good for safety)
             setTasks(prev => prev.map(t =>
               t.id === newRow.id ? mapped : t
             ))
           }
           else if (eventType === 'DELETE') {
-            // If deleted remotely, remove locally. 
-            // Optional: Move to recycle bin? For now, straight delete to match sync behavior.
             setTasks(prev => {
               const task = prev.find(t => t.id === oldRow.id)
               if (task) {
-                // Add to local recycle bin for safety (this ensures "Undo" works if you just deleted it on another device? No, that's confusing. 
-                // But if someone ELSE deletes it, it should vanish.)
-                // Let's just remove it.
                 return prev.filter(t => t.id !== oldRow.id)
               }
               return prev
@@ -221,12 +229,15 @@ function App() {
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('DEBUG: Realtime Status:', status)
+      })
 
     return () => {
+      console.log('DEBUG: Unsubscribing Realtime')
       supabase.removeChannel(channel)
     }
-  }, [session])
+  }, [session?.access_token]) // Only re-run if the ACCESS TOKEN changes
 
   // ==========================================================================
   // PERSISTENCE EFFECTS
