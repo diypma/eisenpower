@@ -209,7 +209,10 @@ function App() {
           const { eventType, new: newRow, old: oldRow } = payload
 
           if (eventType === 'INSERT') {
-            setTasks(prev => [...prev, mapTaskFromDb(newRow)])
+            setTasks(prev => {
+              if (prev.some(t => t.id === newRow.id)) return prev
+              return [...prev, mapTaskFromDb(newRow)]
+            })
           }
           else if (eventType === 'UPDATE') {
             const mapped = mapTaskFromDb(newRow)
