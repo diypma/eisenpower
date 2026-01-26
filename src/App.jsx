@@ -234,30 +234,46 @@ function App() {
           const { eventType, new: newRow, old: oldRow } = payload
 
           if (eventType === 'INSERT') {
-            setTasks(prev => {
-              if (prev.some(t => t.id === newRow.id)) return prev
-              return [...prev, mapTaskFromDb(newRow)]
-            })
+            try {
+              const mappedTask = mapTaskFromDb(newRow)
+              console.log('DEBUG: Mapped INSERT task:', mappedTask?.id, mappedTask?.text?.substring(0, 20))
+              setTasks(prev => {
+                if (prev.some(t => t.id === newRow.id)) {
+                  console.log('DEBUG: INSERT skipped - task already exists')
+                  return prev
+                }
+                console.log('DEBUG: INSERT applied - adding task to state')
+                return [...prev, mappedTask]
+              })
+            } catch (err) {
+              console.error('DEBUG: INSERT handler error:', err)
+            }
           }
           else if (eventType === 'UPDATE') {
-            const mapped = mapTaskFromDb(newRow)
-            setTasks(prev => prev.map(t => {
-              if (t.id === newRow.id) {
-                // Smart Merge: Only overwrite local fields if the DB payload actually contains them.
-                // This handles cases where Realtime sends partial updates or defaults are missing.
-                return {
-                  ...t,
-                  ...mapped,
-                  // Explicitly preserve local values if mapped values are undefined/null/invalid due to partial payload
-                  text: mapped.text !== undefined ? mapped.text : t.text,
-                  completed: mapped.completed !== undefined ? mapped.completed : t.completed,
-                  completedAt: mapped.completed !== undefined ? mapped.completedAt : t.completedAt, // Link completion state/time
-                  x: (mapped.x !== 50 || newRow.x_position !== undefined) ? mapped.x : t.x, // 50 is default, check raw row
-                  y: (mapped.y !== 50 || newRow.y_position !== undefined) ? mapped.y : t.y
+            try {
+              const mapped = mapTaskFromDb(newRow)
+              console.log('DEBUG: Mapped UPDATE task:', mapped?.id, 'x:', mapped?.x, 'y:', mapped?.y)
+              setTasks(prev => prev.map(t => {
+                if (t.id === newRow.id) {
+                  console.log('DEBUG: UPDATE applied to task:', t.id)
+                  // Smart Merge: Only overwrite local fields if the DB payload actually contains them.
+                  // This handles cases where Realtime sends partial updates or defaults are missing.
+                  return {
+                    ...t,
+                    ...mapped,
+                    // Explicitly preserve local values if mapped values are undefined/null/invalid due to partial payload
+                    text: mapped.text !== undefined ? mapped.text : t.text,
+                    completed: mapped.completed !== undefined ? mapped.completed : t.completed,
+                    completedAt: mapped.completed !== undefined ? mapped.completedAt : t.completedAt, // Link completion state/time
+                    x: (mapped.x !== 50 || newRow.x_position !== undefined) ? mapped.x : t.x, // 50 is default, check raw row
+                    y: (mapped.y !== 50 || newRow.y_position !== undefined) ? mapped.y : t.y
+                  }
                 }
-              }
-              return t
-            }))
+                return t
+              }))
+            } catch (err) {
+              console.error('DEBUG: UPDATE handler error:', err)
+            }
           }
           else if (eventType === 'DELETE') {
             setTasks(prev => {
