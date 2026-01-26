@@ -265,6 +265,9 @@ const TaskNode = memo(function TaskNode({
     const visualX = task.x
     const visualY = task.y
 
+    // Calculate priority from visual position for live updates during drag
+    const currentPriority = (visualY * 0.6) + (visualX * 0.4)
+
     return (
         <div
             ref={nodeRef}
