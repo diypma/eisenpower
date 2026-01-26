@@ -360,7 +360,10 @@ function App() {
 
     if (session) {
       try {
-        const dbPayload = mapTaskToDb(newTask)
+        const dbPayload = {
+          ...mapTaskToDb(newTask),
+          user_id: session.user.id
+        }
         // Let Supabase generate the ID
         const { data, error } = await supabase.from('tasks').insert(dbPayload).select().single()
 
