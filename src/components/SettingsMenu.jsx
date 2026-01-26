@@ -286,9 +286,9 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                                         type="text"
                                                         inputMode="numeric"
                                                         autoFocus
-                                                        placeholder="123456"
+                                                        placeholder="12345678"
                                                         value={otpCode}
-                                                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
                                                         className="w-full px-3 py-3 rounded-lg border-2 border-indigo-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-center text-xl font-bold tracking-[0.5em] mb-3 focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
                                                         required
                                                     />
@@ -302,7 +302,7 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                                         </button>
                                                         <button
                                                             type="submit"
-                                                            disabled={loading || otpCode.length !== 6}
+                                                            disabled={loading || otpCode.length < 6}
                                                             className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 disabled:opacity-50"
                                                         >
                                                             {loading ? 'Verifying...' : 'Verify'}
