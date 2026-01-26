@@ -11,19 +11,38 @@ export const migrateTasksToRelational = async (tasks, session) => {
     if (!session?.user?.id) return { success: false, error: 'No authenticated user' }
     if (!tasks || tasks.length === 0) return { success: true, count: 0 }
 
+    const safeDate = (val) => {
+        try {
+            // fast-fail for small integers (demo IDs like 1, 2)
+            if (typeof val === 'number' && val < 100000) return new Date().toISOString()
+
+            // Handle strings that should be numbers
+            const numVal = Number(val)
+            if (!isNaN(numVal) && numVal > 100000) {
+                return new Date(numVal).toISOString()
+            }
+
+            const d = new Date(val)
+            if (isNaN(d.getTime())) return new Date().toISOString()
+            return d.toISOString()
+        } catch (e) {
+            return new Date().toISOString()
+        }
+    }
+
     const formattedTasks = tasks.map(t => ({
         user_id: session.user.id,
         text: t.text,
         x_position: t.x,
         y_position: t.y,
         is_completed: t.completed || false,
-        completed_at: t.completedAt || null,
+        completed_at: t.completedAt ? safeDate(t.completedAt) : null,
         due_date: t.dueDate || null,
         duration_days: t.durationDays || null,
-        auto_urgency: t.autoUrgency !== false, // Default to true if undefined
+        auto_urgency: t.autoUrgency !== false,
         subtasks: t.subtasks || [],
-        created_at: new Date(t.id).toISOString(), // Assuming ID is timestamp
-        updated_at: new Date(t.updatedAt || t.id).toISOString()
+        created_at: safeDate(t.id),
+        updated_at: safeDate(t.updatedAt || t.id)
     }))
 
     try {
