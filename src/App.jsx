@@ -114,6 +114,22 @@ function App() {
   // CLOUD SYNC v3.0 (Relational + Realtime)
   // ==========================================================================
 
+  // Helper: Safe Date Parser for Safari
+  const safeParseDate = (dateStr) => {
+    if (!dateStr) return Date.now()
+    const d = new Date(dateStr)
+    // Check for Invalid Date (Safari is strict)
+    if (isNaN(d.getTime())) {
+      // Fallback: Try replacing space with T if typical SQL format "YYYY-MM-DD HH:MM:SS"
+      if (typeof dateStr === 'string') {
+        const d2 = new Date(dateStr.replace(' ', 'T'))
+        if (!isNaN(d2.getTime())) return d2.getTime()
+      }
+      return Date.now()
+    }
+    return d.getTime()
+  }
+
   // Helper: Map Supabase DB Row -> App Task Object
   const mapTaskFromDb = (row) => ({
     id: row.id, // UUID now, but we handle that
@@ -126,7 +142,7 @@ function App() {
     durationDays: row.duration_days,
     autoUrgency: row.auto_urgency,
     subtasks: row.subtasks || [],
-    updatedAt: new Date(row.updated_at).getTime()
+    updatedAt: safeParseDate(row.updated_at)
   })
 
   // Helper: Map App Task Object -> Supabase DB Row
