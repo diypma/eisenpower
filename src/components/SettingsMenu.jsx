@@ -50,31 +50,21 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
     // AUTH HANDLER
     // ==========================================================================
 
-    const handleLogin = async (e) => {
+    const handleSendOtp = async (e) => {
         e.preventDefault()
         setLoading(true)
         setMessage(null)
 
         try {
-            if (isSignUp) {
-                const { data, error } = await supabase.auth.signUp({
-                    email,
-                    password,
-                })
-                if (error) throw error
-
-                if (data?.session) {
-                    setMessage('Account created and logged in!')
-                } else {
-                    setMessage('Check your email to confirm your account!')
+            const { error } = await supabase.auth.signInWithOtp({
+                email,
+                options: {
+                    shouldCreateUser: true
                 }
-            } else {
-                const { error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                })
-                if (error) throw error
-            }
+            })
+            if (error) throw error
+            setAuthStep('code')
+            setMessage('Check your email for a 6-digit code!')
         } catch (error) {
             console.error(error)
             alert(error.error_description || error.message)
@@ -82,6 +72,34 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
             setLoading(false)
         }
     }
+
+    const handleVerifyOtp = async (e) => {
+        e.preventDefault()
+        setLoading(true)
+        setMessage(null)
+
+        try {
+            const { error } = await supabase.auth.verifyOtp({
+                email,
+                token: otpCode,
+                type: 'email'
+            })
+            if (error) throw error
+
+            // Success! The Auth listener in App.jsx will catch the new session
+            setShowLogin(false)
+            setAuthStep('email')
+            setOtpCode('')
+            setMessage(null)
+            setEmail('')
+        } catch (error) {
+            console.error(error)
+            alert(error.error_description || error.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
