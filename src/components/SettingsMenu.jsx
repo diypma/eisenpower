@@ -281,8 +281,8 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                             </h3>
                                             <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-3">
                                                 {authStep === 'email'
-                                                    ? 'Enter your email to receive a 6-digit login code.'
-                                                    : 'Type the 6-digit code sent to your email.'}
+                                                    ? 'Enter your email to receive a login code.'
+                                                    : 'Type the code sent to your email.'}
                                             </p>
                                             {message && (
                                                 <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] p-2 rounded-lg mb-3">
@@ -323,7 +323,7 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                                         type="text"
                                                         inputMode="numeric"
                                                         autoFocus
-                                                        placeholder="12345678"
+                                                        placeholder="123456"
                                                         value={otpCode}
                                                         onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
                                                         className="w-full px-3 py-3 rounded-lg border-2 border-indigo-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-center text-xl font-bold tracking-[0.5em] mb-3 focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
