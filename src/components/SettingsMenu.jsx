@@ -20,8 +20,8 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
 
     const [isOpen, setIsOpen] = useState(false)
     const [email, setEmail] = useState('')
-    const [password, setPassword] = useState('')
-    const [isSignUp, setIsSignUp] = useState(false)
+    const [otpCode, setOtpCode] = useState('')
+    const [authStep, setAuthStep] = useState('email') // 'email' | 'code'
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState(null)
     const [showLogin, setShowLogin] = useState(false)
@@ -86,6 +86,7 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
     const handleLogout = async () => {
         await supabase.auth.signOut()
         setIsOpen(false)
+        setAuthStep('email')
     }
 
     // ==========================================================================
@@ -221,35 +222,28 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                     ) : (
                                         <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700">
                                             <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-2">
-                                                {isSignUp ? 'Create Account' : 'Sign In'}
+                                                {authStep === 'email' ? 'Sign In / Join' : 'Enter Code'}
                                             </h3>
                                             <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-3">
-                                                {isSignUp
-                                                    ? 'Join Eisenpower to sync your tasks across devices.'
-                                                    : 'Welcome back! Sign in to sync your data.'}
+                                                {authStep === 'email'
+                                                    ? 'Enter your email to receive a 6-digit login code.'
+                                                    : 'Type the 6-digit code sent to your email.'}
                                             </p>
-                                            {message ? (
-                                                <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-xs p-3 rounded-lg mb-3">
+                                            {message && (
+                                                <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] p-2 rounded-lg mb-3">
                                                     {message}
                                                 </div>
-                                            ) : (
-                                                <form onSubmit={handleLogin}>
+                                            )}
+
+                                            {authStep === 'email' ? (
+                                                <form onSubmit={handleSendOtp}>
                                                     <input
                                                         type="email"
                                                         placeholder="name@example.com"
                                                         value={email}
                                                         onChange={(e) => setEmail(e.target.value)}
-                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                                        required
-                                                    />
-                                                    <input
-                                                        type="password"
-                                                        placeholder="Password"
-                                                        value={password}
-                                                        onChange={(e) => setPassword(e.target.value)}
                                                         className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                                         required
-                                                        minLength={6}
                                                     />
                                                     <div className="flex gap-2">
                                                         <button
@@ -264,16 +258,38 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                                             disabled={loading}
                                                             className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 disabled:opacity-50"
                                                         >
-                                                            {loading ? 'Processing...' : (isSignUp ? 'Join' : 'Sign In')}
+                                                            {loading ? 'Sending...' : 'Send Code'}
                                                         </button>
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setIsSignUp(!isSignUp)}
-                                                        className="w-full mt-3 text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
-                                                    >
-                                                        {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Create one"}
-                                                    </button>
+                                                </form>
+                                            ) : (
+                                                <form onSubmit={handleVerifyOtp}>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        autoFocus
+                                                        placeholder="123456"
+                                                        value={otpCode}
+                                                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                                        className="w-full px-3 py-3 rounded-lg border-2 border-indigo-500 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-center text-xl font-bold tracking-[0.5em] mb-3 focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
+                                                        required
+                                                    />
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setAuthStep('email')}
+                                                            className="flex-1 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                                        >
+                                                            Back
+                                                        </button>
+                                                        <button
+                                                            type="submit"
+                                                            disabled={loading || otpCode.length !== 6}
+                                                            className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 disabled:opacity-50"
+                                                        >
+                                                            {loading ? 'Verifying...' : 'Verify'}
+                                                        </button>
+                                                    </div>
                                                 </form>
                                             )}
                                         </div>
