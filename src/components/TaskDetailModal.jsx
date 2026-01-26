@@ -492,9 +492,7 @@ export default function TaskDetailModal({
                     </button>
                     <button
                         onClick={() => {
-                            if (window.confirm("Mark this task as complete?")) {
-                                onComplete(task.id);
-                            }
+                            onComplete(task.id);
                         }}
                         className="px-4 md:px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
                     >
