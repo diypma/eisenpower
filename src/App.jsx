@@ -155,7 +155,7 @@ function App() {
   /**
    * fetchRemoteTasks - Loads the "True State" from Supabase
    */
-  const fetchRemoteTasks = useCallback(async () => {
+  const fetchRemoteTasks = async () => {
     if (!session) return
 
     const { data, error } = await supabase
@@ -177,9 +177,13 @@ function App() {
       if (mapped.length > 0) {
         setTasks(mapped)
         localStorage.setItem('eisenpower-has-synced-v3', 'true')
+      } else {
+        // If cloud is empty but we have local tasks, and we haven't synced v3 yet,
+        // we might be in the "Pre-Migration" state. 
+        // We do NOT wipe local tasks here. We wait for user to click "Migrate".
       }
     }
-  }, [session])
+  }
 
   /**
    * Realtime Subscription
