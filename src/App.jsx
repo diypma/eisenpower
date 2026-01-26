@@ -232,7 +232,11 @@ function App() {
 
   /** Persist tasks to localStorage whenever they change */
   useEffect(() => {
-    localStorage.setItem('eisenpower-tasks', JSON.stringify(tasks))
+    // Debounce persistence to prevent main-thread blocking during high-frequency updates (updates at 60fps during drag)
+    const timeout = setTimeout(() => {
+      localStorage.setItem('eisenpower-tasks', JSON.stringify(tasks))
+    }, 1000)
+    return () => clearTimeout(timeout)
   }, [tasks])
 
   /** Persist theme and apply to document */
