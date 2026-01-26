@@ -12,7 +12,7 @@
  * - Subtask return-to-parent detection
  */
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, memo } from 'react'
 import { getTaskAccentColor, getScoreColor } from '../utils/colorUtils'
 
 // ==========================================================================
@@ -37,7 +37,7 @@ function getPriorityColor(score) {
 // COMPONENT
 // ==========================================================================
 
-export default function TaskNode({
+const TaskNode = memo(function TaskNode({
     task,
     onMove,
     onDelete,
@@ -111,9 +111,9 @@ export default function TaskNode({
          * Converts pixel movement to percentage coordinates
          */
         const handleMouseMove = (e) => {
-            if (!containerRef.current) return
+            const rect = dragRef.current.rect
+            if (!rect) return
 
-            const rect = containerRef.current.getBoundingClientRect()
             const deltaX = e.clientX - dragRef.current.startX
             const deltaY = e.clientY - dragRef.current.startY
 
@@ -184,11 +184,12 @@ export default function TaskNode({
          * Similar to mouse but uses touch coordinates
          */
         const handleTouchMove = (e) => {
-            if (!containerRef.current) return
             e.preventDefault() // Prevent scrolling while dragging
 
             const touch = e.touches[0]
-            const rect = containerRef.current.getBoundingClientRect()
+            const rect = dragRef.current.rect
+            if (!rect) return
+
             const deltaX = touch.clientX - dragRef.current.startX
             const deltaY = touch.clientY - dragRef.current.startY
 
@@ -225,18 +226,25 @@ export default function TaskNode({
     const handleMouseDown = (e) => {
         // Only left-click, ignore clicks on buttons
         if ((e.type === 'mousedown' && e.button !== 0) || e.target.closest('button')) return
+        if (!containerRef.current) return
 
         const clientX = e.clientX || e.touches[0].clientX
         const clientY = e.clientY || e.touches[0].clientY
 
+        const rect = containerRef.current.getBoundingClientRect()
+
         setIsDragging(true)
+        // Initialize drag pos to current pos
+        setDragPosition({ x: task.x, y: task.y })
+
         dragRef.current = {
             startX: clientX,
             startY: clientY,
             initialTaskX: task.x,
             initialTaskY: task.y,
             startTime: Date.now(),
-            totalDist: 0
+            totalDist: 0,
+            rect
         }
 
         // Prevent default for proper drag behavior
@@ -290,7 +298,7 @@ export default function TaskNode({
                     rounded-2xl shadow-lg relative
                     ${isSubtaskNode
                         ? 'p-2 min-w-[100px] max-w-[150px] bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-2'
-                        : `p-3 min-w-[140px] max-w-[200px] bg-gradient-to-br ${getPriorityColor(priority)} text-white border-2 border-white/30`
+                        : `p-3 min-w-[140px] max-w-[200px] bg-gradient-to-br ${getPriorityColor(currentPriority)} text-white border-2 border-white/30`
                     }
                     font-semibold text-sm
                     ${isDragging ? 'ring-4 ring-indigo-200/50' : 'hover:shadow-xl'}
@@ -330,7 +338,7 @@ export default function TaskNode({
                 {/* Footer: Priority Score & Subtask Count */}
                 {!isSubtaskNode && (
                     <div className="mt-1 flex justify-between items-center text-[10px] opacity-80 pt-1 border-t border-white/20">
-                        <span>{priority.toFixed(0)} pts</span>
+                        <span>{currentPriority.toFixed(0)} pts</span>
                         {subtaskCount > 0 && (
                             <span>{completedCount}/{subtaskCount} subtasks</span>
                         )}
@@ -339,4 +347,6 @@ export default function TaskNode({
             </div>
         </div>
     )
-}
+})
+
+export default TaskNode
