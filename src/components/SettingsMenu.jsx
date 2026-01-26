@@ -20,6 +20,8 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
 
     const [isOpen, setIsOpen] = useState(false)
     const [email, setEmail] = useState('')
+    const [password, setPassword] = useState('')
+    const [isSignUp, setIsSignUp] = useState(false)
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState(null)
     const [showLogin, setShowLogin] = useState(false)
@@ -54,14 +56,25 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
         setMessage(null)
 
         try {
-            const { error } = await supabase.auth.signInWithOtp({
-                email,
-                options: {
-                    emailRedirectTo: window.location.origin
+            if (isSignUp) {
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                })
+                if (error) throw error
+
+                if (data?.session) {
+                    setMessage('Account created and logged in!')
+                } else {
+                    setMessage('Check your email to confirm your account!')
                 }
-            })
-            if (error) throw error
-            setMessage('Check your email for the login link!')
+            } else {
+                const { error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                })
+                if (error) throw error
+            }
         } catch (error) {
             console.error(error)
             alert(error.error_description || error.message)
@@ -207,9 +220,13 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                         </button>
                                     ) : (
                                         <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700">
-                                            <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-2">Sign In</h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                                                Enter your email to receive a magic login link. No password needed.
+                                            <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-2">
+                                                {isSignUp ? 'Create Account' : 'Sign In'}
+                                            </h3>
+                                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-3">
+                                                {isSignUp
+                                                    ? 'Join Eisenpower to sync your tasks across devices.'
+                                                    : 'Welcome back! Sign in to sync your data.'}
                                             </p>
                                             {message ? (
                                                 <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-xs p-3 rounded-lg mb-3">
@@ -222,8 +239,17 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                                         placeholder="name@example.com"
                                                         value={email}
                                                         onChange={(e) => setEmail(e.target.value)}
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                        required
+                                                    />
+                                                    <input
+                                                        type="password"
+                                                        placeholder="Password"
+                                                        value={password}
+                                                        onChange={(e) => setPassword(e.target.value)}
                                                         className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                                         required
+                                                        minLength={6}
                                                     />
                                                     <div className="flex gap-2">
                                                         <button
@@ -238,9 +264,16 @@ export default function SettingsMenu({ tasks, setTasks, isDark, onToggleTheme, s
                                                             disabled={loading}
                                                             className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 disabled:opacity-50"
                                                         >
-                                                            {loading ? 'Sending...' : 'Send Link'}
+                                                            {loading ? 'Processing...' : (isSignUp ? 'Join' : 'Sign In')}
                                                         </button>
                                                     </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsSignUp(!isSignUp)}
+                                                        className="w-full mt-3 text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                                                    >
+                                                        {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Create one"}
+                                                    </button>
                                                 </form>
                                             )}
                                         </div>
