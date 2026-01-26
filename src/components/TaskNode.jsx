@@ -57,6 +57,7 @@ const TaskNode = memo(function TaskNode({
     // ==========================================================================
 
     const [isDragging, setIsDragging] = useState(false)
+    const [dragPosition, setDragPosition] = useState(null)
 
     // Track drag state without causing re-renders
     const dragRef = useRef({
@@ -65,17 +66,22 @@ const TaskNode = memo(function TaskNode({
         initialTaskX: 0,
         initialTaskY: 0,
         startTime: 0,
-        totalDist: 0
+        totalDist: 0,
+        rect: null
     })
 
     const nodeRef = useRef(null)
 
-    // Use ref for onMove to avoid stale closures in event listeners
+    // Use refs for callbacks to avoid dependency churn in listeners
     const onMoveRef = useRef(onMove)
+    const onMoveEndRef = useRef(onMoveEnd)
+    const onExpandRef = useRef(onExpand)
 
     useEffect(() => {
         onMoveRef.current = onMove
-    }, [onMove])
+        onMoveEndRef.current = onMoveEnd
+        onExpandRef.current = onExpand
+    }, [onMove, onMoveEnd, onExpand])
 
     // ==========================================================================
     // COMPUTED VALUES
@@ -92,16 +98,9 @@ const TaskNode = memo(function TaskNode({
     const subtaskCount = task.subtasks?.length || 0
     const completedCount = task.subtasks?.filter(s => s.completed)?.length || 0
 
-    // ==========================================================================
+    // = : =========================================================================
     // DRAG HANDLERS
-    // ==========================================================================
-
-    const onMoveEndRef = useRef(onMoveEnd)
-    const lastPosRef = useRef({ x: task.x, y: task.y })
-
-    useEffect(() => {
-        onMoveEndRef.current = onMoveEnd
-    }, [onMoveEnd])
+    // =========================================================================
 
     useEffect(() => {
         if (!isDragging) return
@@ -128,8 +127,8 @@ const TaskNode = memo(function TaskNode({
             const clampedX = Math.max(0, Math.min(100, newX))
             const clampedY = Math.max(0, Math.min(100, newY))
 
-            lastPosRef.current = { x: clampedX, y: clampedY }
-            onMoveRef.current(task.id, clampedX, clampedY)
+            // Update LOCAL state only (fast re-render of just this node)
+            setDragPosition({ x: clampedX, y: clampedY })
         }
 
         /**
@@ -142,41 +141,52 @@ const TaskNode = memo(function TaskNode({
 
             setIsDragging(false)
 
-            // Set global timestamp when drag ends - used by GraphPaper to ignore false clicks
-            window.__eisenpowerLastDragEnd = Date.now()
+            // Get final position from state and reset it
+            setDragPosition(prev => {
+                const finalX = prev?.x ?? task.x
+                const finalY = prev?.y ?? task.y
 
-            const duration = Date.now() - dragRef.current.startTime
-            const distance = dragRef.current.totalDist
+                // Set global timestamp when drag ends - used by GraphPaper to ignore false clicks
+                window.__eisenpowerLastDragEnd = Date.now()
 
-            // Short, small movement = Click (expand task details)
-            if (duration < 250 && distance < 6) {
-                onExpand(task.id)
-                return
-            }
+                const duration = Date.now() - dragRef.current.startTime
+                const distance = dragRef.current.totalDist
 
-            // It was a drag! Commit the final position
-            if (onMoveEndRef.current) {
-                onMoveEndRef.current(task.id, lastPosRef.current.x, lastPosRef.current.y)
-            }
+                // Short, small movement = Click (expand task details)
+                if (duration < 250 && distance < 6) {
+                    onExpandRef.current(task.id)
+                    return null
+                }
 
-            // Check if subtask was dropped back onto its parent task
-            if (isSubtaskNode && task.parentId && onReturnSubtask) {
-                const parentNode = document.querySelector(`.task-node[data-task-id="${task.parentId}"]`)
+                // It was a drag! Commit the final position to parent and database
+                if (onMoveRef.current) {
+                    onMoveRef.current(task.id, finalX, finalY)
+                }
+                if (onMoveEndRef.current) {
+                    onMoveEndRef.current(task.id, finalX, finalY)
+                }
 
-                if (parentNode) {
-                    const rect = parentNode.getBoundingClientRect()
-                    const isOverParent = (
-                        clientX >= rect.left &&
-                        clientX <= rect.right &&
-                        clientY >= rect.top &&
-                        clientY <= rect.bottom
-                    )
+                // Check if subtask was dropped back onto its parent task
+                if (isSubtaskNode && task.parentId && onReturnSubtask) {
+                    const parentNode = document.querySelector(`.task-node[data-task-id="${task.parentId}"]`)
 
-                    if (isOverParent) {
-                        onReturnSubtask(task.parentId, task.id)
+                    if (parentNode) {
+                        const rect = parentNode.getBoundingClientRect()
+                        const isOverParent = (
+                            clientX >= rect.left &&
+                            clientX <= rect.right &&
+                            clientY >= rect.top &&
+                            clientY <= rect.bottom
+                        )
+
+                        if (isOverParent) {
+                            onReturnSubtask(task.parentId, task.id)
+                        }
                     }
                 }
-            }
+
+                return null
+            })
         }
 
         /**
@@ -201,8 +211,8 @@ const TaskNode = memo(function TaskNode({
             const clampedX = Math.max(0, Math.min(100, newX))
             const clampedY = Math.max(0, Math.min(100, newY))
 
-            lastPosRef.current = { x: clampedX, y: clampedY }
-            onMoveRef.current(task.id, clampedX, clampedY)
+            // Update LOCAL state
+            setDragPosition({ x: clampedX, y: clampedY })
         }
 
         // Attach global listeners for drag tracking
@@ -261,9 +271,9 @@ const TaskNode = memo(function TaskNode({
     // ==========================================================================
 
     // Use direct coordinates - allow tasks to position at true 0-100%
-    // Overflow handling is managed at container level
-    const visualX = task.x
-    const visualY = task.y
+    // If dragging, use local high-frame-rate position. If idle, use props (source of truth).
+    const visualX = dragPosition ? dragPosition.x : task.x
+    const visualY = dragPosition ? dragPosition.y : task.y
 
     // Calculate priority from visual position for live updates during drag
     const currentPriority = (visualY * 0.6) + (visualX * 0.4)
