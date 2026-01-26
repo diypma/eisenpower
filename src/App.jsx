@@ -199,8 +199,10 @@ function App() {
             setTasks(prev => [...prev, mapTaskFromDb(newRow)])
           }
           else if (eventType === 'UPDATE') {
+            const mapped = mapTaskFromDb(newRow)
+            // console.log('DEBUG: Realtime Update Received', { eventType, newRow, mapped })
             setTasks(prev => prev.map(t =>
-              t.id === newRow.id ? mapTaskFromDb(newRow) : t
+              t.id === newRow.id ? mapped : t
             ))
           }
           else if (eventType === 'DELETE') {
@@ -526,7 +528,12 @@ function App() {
     setExpandedTaskId(null)
 
     if (session) {
-      supabase.from('tasks').update({ is_completed: true, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', taskId).then()
+      supabase.from('tasks')
+        .update({ is_completed: true, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('id', taskId)
+        .then(({ error }) => {
+          if (error) console.error('DEBUG: completeTask Failed', error)
+        })
     }
   }
 
